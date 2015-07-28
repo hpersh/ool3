@@ -233,6 +233,19 @@ inst_init_parent(obj_t self, obj_t cl, unsigned argc, va_list ap)
   (*CLASS(parent)->init)(self, parent, argc, ap);
 }
 
+void
+inst_init(obj_t self, unsigned argc, ...)
+{
+  obj_t   cl = inst_of(self);
+  va_list ap;
+
+  va_start(ap, argc);
+
+  (*CLASS(cl)->init)(self, cl, argc, ap);
+
+  va_end(ap);
+}
+
 /***************************************************************************/
 
 void
@@ -297,23 +310,11 @@ bool_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
   inst_init_parent(self, cl, argc, ap);
 }
 
-static inline void
-_bool_init(obj_t *dst, unsigned argc, ...)
-{
-  va_list ap;
-
-  va_start(ap, argc);
-
-  bool_init(*dst, consts.cl_bool, argc, ap);
-
-  va_end(ap);
-}
-
 void
 bool_new(obj_t *dst, unsigned val)
 {
   inst_alloc(dst, consts.cl_bool);
-  _bool_init(dst, 1, val);
+  inst_init(*dst, 1, val);
 }
 
 void
@@ -357,24 +358,11 @@ int_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
   inst_init_parent(self, cl, argc, ap);
 }
 
-static inline void
-_int_init(obj_t self, unsigned argc, ...)
-{
-  va_list ap;
-
-  va_start(ap, argc);
-
-  int_init(self, consts.cl_int, argc, ap);
-
-  va_end(ap);
-}
-
-
 void
 int_new(obj_t *dst, intval_t val)
 {
   inst_alloc(dst, consts.cl_int);
-  _int_init(*dst, 1, val);
+  inst_init(*dst, 1, val);
 }
 
 void
@@ -544,17 +532,36 @@ strdict_find(obj_t dict, obj_t key, obj_t **bucket)
   return (0);
 }
 
+unsigned
+round_up_to_power_of_2(unsigned n)
+{
+  unsigned nn;
+
+  if (n <= 2)  return (n);
+
+  for (--n;;) {
+    nn = n & (n - 1);
+    if (nn == 0)  return (n << 1);
+    n = nn;
+  }
+}
+
 enum {
   STRDICT_SIZE_DFLT = 32
 };
 
-void _dict_new(obj_t *dst, obj_t *(*find)(obj_t, obj_t, obj_t **), unsigned size);
-void dict_new(obj_t *dst, unsigned size);
-
 void
 strdict_new(obj_t *dst, unsigned size)
 {
-  _dict_new(dst, strdict_find, size == 0 ? STRDICT_SIZE_DFLT : size);
+  inst_alloc(dst, consts.cl_dict);
+
+  if (size == 0) {
+    size = STRDICT_SIZE_DFLT;
+  } else {
+    size = round_up_to_power_of_2(size);
+  }
+
+  inst_init(*dst, 2, strdict_find, size);
 }
 
 
@@ -871,23 +878,19 @@ set_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 
 /***************************************************************************/
 
-enum {
-  DICT_DFLT_SIZE = 32
-};
-
-unsigned
-round_up_to_power_of_2(unsigned n)
+void
+dict_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 {
-  unsigned nn;
+  assert(argc > 0);
 
-  if (n <= 2)  return (n);
-
-  for (--n;;) {
-    nn = n & (n - 1);
-    if (nn == 0)  return (n << 1);
-    n = nn;
-  }
+  DICT(self)->find = va_arg(ap, obj_t *(*)(obj_t, obj_t, obj_t **));  --argc;
+  
+  inst_init_parent(self, cl, argc, ap);
 }
+
+enum {
+  DICT_SIZE_DFLT = 32
+};
 
 obj_t *
 dict_find(obj_t dict, obj_t key, obj_t **bucket)
@@ -916,45 +919,19 @@ dict_find(obj_t dict, obj_t key, obj_t **bucket)
   return (result);
 }
 
-
-void
-dict_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
-{
-  assert(argc > 0);
-
-  DICT(self)->find = va_arg(ap, obj_t *(*)(obj_t, obj_t, obj_t **));
-  --argc;
-  
-  inst_init_parent(self, cl, argc, ap);
-}
-
-static inline void
-_dict_init(obj_t self, unsigned argc, ...)
-{
-  va_list ap;
-
-  va_start(ap, argc);
-
-  dict_init(self, consts.cl_dict, argc, ap);
-
-  va_end(ap);
-}
-
-void
-_dict_new(obj_t *dst, obj_t *(*find)(obj_t, obj_t, obj_t **), unsigned size)
-{
-  inst_alloc(dst, consts.cl_dict);
-  _dict_init(*dst, 2, find, round_up_to_power_of_2(size));
-}
-
 void
 dict_new(obj_t *dst, unsigned size)
 {
   inst_alloc(dst, consts.cl_dict);
-  _dict_init(*dst, 2, dict_find, round_up_to_power_of_2(size));
+
+  if (size == 0) {
+    size = DICT_SIZE_DFLT;
+  } else {
+    size = round_up_to_power_of_2(size);
+  }
+
+  inst_init(*dst, 2, dict_find, size);
 }
-
-
 
 obj_t
 dict_at(obj_t dict, obj_t key)
