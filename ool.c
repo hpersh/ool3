@@ -985,6 +985,14 @@ method_call_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
   inst_init_parent(self, cl, argc, ap);
 }
 
+
+void
+method_call_walk(obj_t obj, void (*func)(obj_t))
+{
+  (*func)(METHOD_CALL(obj)->sel);
+  (*func)(METHOD_CALL(obj)->args);
+}
+
 void
 method_call_new(obj_t *dst, obj_t sel, obj_t args)
 {
@@ -1109,6 +1117,13 @@ block_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 }
 
 void
+block_walk(obj_t obj, void (*func)(obj_t))
+{
+  (*func)(BLOCK(obj)->args);
+  (*func)(BLOCK(obj)->body);
+}
+
+void
 block_new(obj_t *dst, obj_t args, obj_t body)
 {
   inst_alloc(dst, consts.cl_block);
@@ -1162,6 +1177,13 @@ module_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
   obj_assign(&MODULE(self)->parent, va_arg(ap, obj_t));  --argc;
 
   inst_init_parent(self, cl, argc, ap);
+}
+
+void
+module_walk(obj_t obj, void (*func)(obj_t))
+{
+  (*func)(MODULE(obj)->name);
+  (*func)(MODULE(obj)->parent);
 }
 
 void
@@ -1382,20 +1404,20 @@ struct {
   void     (*walk)(obj_t obj, void (*func)(obj_t obj));
   void     (*free)(obj_t obj);
 } init_cl_tbl[] = {
-  { &consts.cl_object,      &consts.str_object,      0,                 0,                                    object_init,          0, object_free },
+  { &consts.cl_object,      &consts.str_object,      0,                 0,                                    object_init,                0, object_free },
   { &consts.cl_bool,        &consts.str_boolean,     &consts.cl_object, sizeof(struct inst_bool),               bool_init },
   { &consts.cl_int,         &consts.str_integer,     &consts.cl_object, sizeof(struct inst_int),                 int_init },
-  { &consts.cl_str,         &consts.str_string,      &consts.cl_object, sizeof(struct inst_str),                 str_init,          0,    str_free },
-  { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object, 0,                                      dptr_init,  dptr_walk },
+  { &consts.cl_str,         &consts.str_string,      &consts.cl_object, sizeof(struct inst_str),                 str_init,                0,    str_free },
+  { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object, 0,                                      dptr_init,        dptr_walk },
   { &consts.cl_pair,        &consts.str_pair,        &consts.cl_dptr,   sizeof(struct inst_dptr),        inst_init_parent },
   { &consts.cl_list,        &consts.str_list,        &consts.cl_dptr,   sizeof(struct inst_dptr),        inst_init_parent },
-  { &consts.cl_array,       &consts.str_array,       &consts.cl_object, sizeof(struct inst_array),             array_init, array_walk,  array_free },
+  { &consts.cl_array,       &consts.str_array,       &consts.cl_object, sizeof(struct inst_array),             array_init,       array_walk,  array_free },
   { &consts.cl_set,         &consts.str_set,         &consts.cl_array,  sizeof(struct inst_set),                 set_init },
   { &consts.cl_dict,        &consts.str_dict,        &consts.cl_set,    sizeof(struct inst_dict),               dict_init },
   { &consts.cl_code_method, &consts.str_code_method, &consts.cl_object, sizeof(struct inst_code_method), code_method_init },
-  { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object, sizeof(struct inst_method_call), method_call_init },
-  { &consts.cl_block,       &consts.str_block,       &consts.cl_object, sizeof(struct inst_block),             block_init },
-  { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,   sizeof(struct inst_module),           module_init }
+  { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object, sizeof(struct inst_method_call), method_call_init, method_call_walk },
+  { &consts.cl_block,       &consts.str_block,       &consts.cl_object, sizeof(struct inst_block),             block_init,       block_walk },
+  { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,   sizeof(struct inst_module),           module_init,      module_walk }
 };
 
 struct {
