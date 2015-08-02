@@ -179,6 +179,19 @@ ool_mem_allocz(unsigned size)
 
 /***************************************************************************/
 
+obj_t
+base_class_same_inst_size(obj_t cl)
+{
+  obj_t    result;
+  unsigned s = CLASS(cl)->inst_size;
+
+  for (cl = CLASS(result = cl)->parent; cl != 0 && CLASS(cl)->inst_size == s; cl = CLASS(cl)->parent) {
+    result = cl;
+  }
+
+  return (result);
+}
+
 void
 obj_free(obj_t obj)
 {
@@ -199,7 +212,7 @@ inst_alloc(obj_t *dst, obj_t cl)
   obj_t    p;
   unsigned size = CLASS(cl)->inst_size;
 
-  if (size == 0) {
+  if (CLASS(cl)->flags & CLASS_FLAG_ABSTRACT) {
     fprintf(stderr, "Cannot instantiate class %s\n", STR(CLASS(cl)->name)->data);
     error();
   }
@@ -255,8 +268,11 @@ object_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 void
 object_free(obj_t obj)
 {
+  obj_t cl = inst_of(obj);
 
-  ool_mem_free(obj, CLASS(inst_of(obj))->inst_size);
+  obj_release(cl);
+  
+  list_insert(obj->list_node, CLASS(base_class_same_inst_size(cl))->inst_cache);
 }
 
 void
@@ -1401,25 +1417,26 @@ struct {
   obj_t    *var;
   obj_t    *name;
   obj_t    *parent;
+  unsigned flags;
   unsigned inst_size;
   void     (*init)(obj_t self, obj_t cl, unsigned argc, va_list ap);
   void     (*walk)(obj_t obj, void (*func)(obj_t obj));
   void     (*free)(obj_t obj);
 } init_cl_tbl[] = {
-  { &consts.cl_object,      &consts.str_object,      0,                 0,                                    object_init,                0, object_free },
-  { &consts.cl_bool,        &consts.str_boolean,     &consts.cl_object, sizeof(struct inst_bool),               bool_init },
-  { &consts.cl_int,         &consts.str_integer,     &consts.cl_object, sizeof(struct inst_int),                 int_init },
-  { &consts.cl_str,         &consts.str_string,      &consts.cl_object, sizeof(struct inst_str),                 str_init,                0,    str_free },
-  { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object, 0,                                      dptr_init,        dptr_walk },
-  { &consts.cl_pair,        &consts.str_pair,        &consts.cl_dptr,   sizeof(struct inst_dptr),        inst_init_parent },
-  { &consts.cl_list,        &consts.str_list,        &consts.cl_dptr,   sizeof(struct inst_dptr),        inst_init_parent },
-  { &consts.cl_array,       &consts.str_array,       &consts.cl_object, sizeof(struct inst_array),             array_init,       array_walk,  array_free },
-  { &consts.cl_set,         &consts.str_set,         &consts.cl_array,  sizeof(struct inst_set),                 set_init },
-  { &consts.cl_dict,        &consts.str_dict,        &consts.cl_set,    sizeof(struct inst_dict),               dict_init },
-  { &consts.cl_code_method, &consts.str_code_method, &consts.cl_object, sizeof(struct inst_code_method), code_method_init },
-  { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object, sizeof(struct inst_method_call), method_call_init, method_call_walk },
-  { &consts.cl_block,       &consts.str_block,       &consts.cl_object, sizeof(struct inst_block),             block_init,       block_walk },
-  { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,   sizeof(struct inst_module),           module_init,      module_walk }
+  { &consts.cl_object,      &consts.str_object,      0,                                   0,                               0,      object_init,                0, object_free },
+  { &consts.cl_bool,        &consts.str_boolean,     &consts.cl_object,                   0,        sizeof(struct inst_bool),        bool_init },
+  { &consts.cl_int,         &consts.str_integer,     &consts.cl_object,                   0,         sizeof(struct inst_int),         int_init },
+  { &consts.cl_str,         &consts.str_string,      &consts.cl_object,                   0,         sizeof(struct inst_str),         str_init,                0,    str_free },
+  { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object, CLASS_FLAG_ABSTRACT,        sizeof(struct inst_dptr),        dptr_init,        dptr_walk },
+  { &consts.cl_pair,        &consts.str_pair,        &consts.cl_dptr,                     0,        sizeof(struct inst_dptr), inst_init_parent },
+  { &consts.cl_list,        &consts.str_list,        &consts.cl_dptr,                     0,        sizeof(struct inst_dptr), inst_init_parent },
+  { &consts.cl_array,       &consts.str_array,       &consts.cl_object,                   0,       sizeof(struct inst_array),       array_init,       array_walk,  array_free },
+  { &consts.cl_set,         &consts.str_set,         &consts.cl_array,                    0,         sizeof(struct inst_set),         set_init },
+  { &consts.cl_dict,        &consts.str_dict,        &consts.cl_set,                      0,        sizeof(struct inst_dict),        dict_init },
+  { &consts.cl_code_method, &consts.str_code_method, &consts.cl_object,                   0, sizeof(struct inst_code_method), code_method_init },
+  { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object,                   0, sizeof(struct inst_method_call), method_call_init, method_call_walk },
+  { &consts.cl_block,       &consts.str_block,       &consts.cl_object,                   0,       sizeof(struct inst_block),       block_init,       block_walk },
+  { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,                     0,      sizeof(struct inst_module),      module_init,      module_walk }
 };
 
 struct {
@@ -1521,6 +1538,7 @@ init(void)
     obj_assign(&cl->inst_of, consts.metaclass);
     obj_assign(&CLASS(cl)->module, consts.module_main);
     obj_assign(&CLASS(cl)->parent, init_cl_tbl[i].parent ? *init_cl_tbl[i].parent : 0);
+    CLASS(cl)->flags     = init_cl_tbl[i].flags;
     CLASS(cl)->inst_size = init_cl_tbl[i].inst_size;
     list_init(CLASS(cl)->inst_cache);
     CLASS(cl)->init = init_cl_tbl[i].init;

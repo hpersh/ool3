@@ -164,6 +164,9 @@ struct class {
   obj_t       name;
   obj_t       module;
   obj_t       parent;
+  enum {
+    CLASS_FLAG_ABSTRACT = 1 << 0
+  }           flags;
   unsigned    inst_size;
   struct list inst_cache[1];
   void        (*init)(obj_t self, obj_t cl, unsigned argc, va_list ap);
