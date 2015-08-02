@@ -178,7 +178,7 @@ void  obj_release(obj_t obj);
 void  obj_assign(obj_t *dst, obj_t obj);
 void  str_newc(obj_t *result, unsigned argc, ...);
 void  error(void);
-obj_t inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv);
+void  inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv);
 obj_t dict_at(obj_t dict, obj_t key);
 void  dict_at_put(obj_t dict, obj_t key, obj_t val);
 void  bool_new(obj_t *dst, unsigned val);
@@ -281,25 +281,26 @@ struct work_frame {
   struct frame      base[1];
   struct work_frame *prev;
   unsigned          size;
-  obj_t             work[1];
+  obj_t             *work;
 };
 
 struct work_frame *wfp;
 
-#define WORK_FRAME_DECL(nm, n)  struct { struct work_frame base[1]; obj_t _w[(n) - 1]; } nm[1];
+#define WORK_FRAME_DECL(nm , n) \
+  obj_t __work_ ## nm [n];	\
+  struct work_frame nm[1] = { { .size = (n), .work = __work_ ## nm } };
 
 static inline void
-_work_frame_push(struct work_frame *wfr, unsigned size)
+_work_frame_push(struct work_frame *wfr)
 {
   wfr->prev = wfp;
-  wfr->size = size;
-  memset(wfr->work, 0, size * sizeof(wfr->work[0]));
+  memset(wfr->work, 0, wfr->size * sizeof(obj_t));
 
   wfp = wfr;
 
   frame_push(wfr->base, FRAME_TYPE_WORK);
 }
-#define WORK_FRAME_PUSH(nm)  (_work_frame_push(nm->base, ARRAY_SIZE(nm->_w) + 1))
+#define WORK_FRAME_PUSH(nm)  (_work_frame_push(nm))
 
 static inline void
 _work_frame_pop(void)
@@ -315,7 +316,7 @@ _work_frame_pop(void)
 }
 #define WORK_FRAME_POP()  (_work_frame_pop())
 
-#define WORK(nm, i)  ((nm)->base->work[i])
+#define WORK(nm, i)  ((nm)->work[i])
 
 struct method_call_frame {
   struct frame             base[1];

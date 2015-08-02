@@ -774,7 +774,7 @@ cm_list_tostring(void)
 
   WORK_FRAME_DECL(work, 1 + nn);
 
-  _work_frame_push(work->base, 1 + nn);
+  WORK_FRAME_PUSH(work);
 
   str_newc(&WORK(work, 0), 1, 2, " ");
 
@@ -1023,7 +1023,7 @@ cm_mc_eval(void)
   {
     WORK_FRAME_DECL(work, n);
 
-    _work_frame_push(work->base, n);
+    WORK_FRAME_PUSH(work);
 
     for (p = METHOD_CALL(MC_ARG(0))->args, q = &WORK(work, 0), k = n;
 	 k > 0; 
@@ -1059,7 +1059,7 @@ cm_mc_tostring(void)
 
   WORK_FRAME_DECL(work, 1 + nn);
 
-  _work_frame_push(work->base, 1 + nn);
+  WORK_FRAME_PUSH(work);
 
   str_newc(&WORK(work, 0), 1, 2, " ");
 
@@ -1243,7 +1243,7 @@ method_find(obj_t cl, unsigned dofs, obj_t sel, obj_t *found_cl)
   return (0);
 }
 
-obj_t
+void
 _method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *argv)
 {
   if (inst_of(m) == consts.cl_code_method) {
@@ -1272,7 +1272,7 @@ _method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *a
   }
 }
 
-obj_t
+void
 method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *argv)
 {
   if (modfp->module != CLASS(cl)->module) {
@@ -1288,7 +1288,7 @@ method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *ar
   }
 }
 
-obj_t
+void
 inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv)
 {
   obj_t cl;
