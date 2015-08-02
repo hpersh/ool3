@@ -1,5 +1,5 @@
 all:
-	gcc -g ool.c parse.c
+	clang -g ool.c parse.c
 
 clean:
 	rm *~ a.out

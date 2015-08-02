@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ctype.h>
 
 #include "ool.h"
 
@@ -29,8 +30,8 @@ stream_file_ungetc(struct stream *str, char c)
 }
 
 struct stream_funcs stream_funcs_file[] = {
-  { getc:   stream_file_getc,
-    ungetc: stream_file_ungetc
+  { .getc   = stream_file_getc,
+    .ungetc = stream_file_ungetc
   }
 };
 
@@ -458,6 +459,8 @@ parse_str(obj_t *dst, char *buf, unsigned len)
   obj_assign(dst, WORK(work, 0));
 
   WORK_FRAME_POP();
+
+  return (true);
 }
 
 unsigned

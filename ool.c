@@ -506,7 +506,7 @@ str_hash(obj_t s)
 
   assert(inst_of(s) == consts.cl_str);
 
-  for (result = 0, p = STR(s)->data; c = *p; ++p) {
+  for (result = 0, p = STR(s)->data; (c = *p) != 0; ++p) {
     result += c;
   }
 
@@ -528,7 +528,7 @@ strdict_find(obj_t dict, obj_t key, obj_t **bucket)
 
   if (bucket)  *bucket = p;
 
-  for ( ; q = *p; p = &CDR(q)) {
+  for ( ; (q = *p) != 0; p = &CDR(q)) {
     if (str_eq(CAR(CAR(q)), key))  return (p);
   }
 
@@ -607,11 +607,13 @@ str_eval(obj_t s)
 {
   obj_t p;
 
-  if (p = str_env_find(s))  return (CDR(p));
+  if ((p = str_env_find(s)) != 0)  return (CDR(p));
 
   fprintf(stderr, "Variable not bound: %s\n", STR(s)->data);
 
   error();
+
+  return (0);
 }
 
 void
@@ -619,7 +621,7 @@ str_bind(obj_t s, obj_t val)
 {
   obj_t p;
 
-  if (p = str_env_find(s)) {
+  if ((p = str_env_find(s)) != 0) {
     obj_assign(&CDR(p), val);
 
     return;
@@ -896,7 +898,7 @@ dict_find(obj_t dict, obj_t key, obj_t **bucket)
 
   if (bucket)  *bucket = p;
 
-  for ( ; q = *p; p = &CDR(q)) {
+  for ( ; (q = *p) != 0; p = &CDR(q)) {
     inst_method_call(&WORK(work, 0), consts.str_equalc, 1, &key);
     if (BOOL(WORK(work, 0))->val) {
       result = p;
@@ -1012,7 +1014,7 @@ cm_mc_eval(void)
   
   sel = METHOD_CALL(MC_ARG(0))->sel;
 
-  if (quotef = (STR(sel)->size >= 2 && STR(sel)->data[0] == '&')) {
+  if ((quotef = (STR(sel)->size >= 2 && STR(sel)->data[0] == '&'))) {
     macrof = STR(sel)->size >= 3 && STR(sel)->data[1] == '&';
   }
   
@@ -1232,7 +1234,7 @@ method_find(obj_t cl, unsigned dofs, obj_t sel, obj_t *found_cl)
   *found_cl = cl;
 
   for ( ; cl; cl = CLASS(cl)->parent) {
-    if (p = dict_at(*(obj_t *)((char *) cl + dofs), sel)) {
+    if ((p = dict_at(*(obj_t *)((char *) cl + dofs), sel)) != 0) {
       *found_cl = cl;
       return (CDR(p));
     }

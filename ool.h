@@ -175,6 +175,7 @@ struct class {
 #define CLASS(x)  ((struct class *)(x))
 
 void  obj_release(obj_t obj);
+void  obj_assign(obj_t *dst, obj_t obj);
 void  str_newc(obj_t *result, unsigned argc, ...);
 void  error(void);
 obj_t inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv);
@@ -182,6 +183,8 @@ obj_t dict_at(obj_t dict, obj_t key);
 void  dict_at_put(obj_t dict, obj_t key, obj_t val);
 void  bool_new(obj_t *dst, unsigned val);
 void  int_new(obj_t *dst, intval_t val);
+void  pair_new(obj_t *dst, obj_t first, obj_t second);
+void  list_new(obj_t *dst, obj_t car, obj_t cdr);
 void  method_call_new(obj_t *dst, obj_t sel, obj_t args);
 void  block_new(obj_t *dst, obj_t args, obj_t body);
 void  module_new(obj_t *dst, obj_t name, obj_t parent);
@@ -392,6 +395,8 @@ struct stream_file {
   
   FILE *fp;
 };
+
+void stream_file_init(struct stream_file *str, FILE *fp);
 
 struct tokbuf {
   unsigned bufsize;
