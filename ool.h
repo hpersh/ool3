@@ -291,7 +291,7 @@ struct work_frame *wfp;
   struct work_frame nm[1] = { { .size = (n), .work = __work_ ## nm } };
 
 static inline void
-_work_frame_push(struct work_frame *wfr)
+work_frame_push(struct work_frame *wfr)
 {
   wfr->prev = wfp;
   memset(wfr->work, 0, wfr->size * sizeof(obj_t));
@@ -300,10 +300,9 @@ _work_frame_push(struct work_frame *wfr)
 
   frame_push(wfr->base, FRAME_TYPE_WORK);
 }
-#define WORK_FRAME_PUSH(nm)  (_work_frame_push(nm))
 
 static inline void
-_work_frame_pop(void)
+work_frame_pop(void)
 {
   obj_t    *p;
   unsigned n;
@@ -314,7 +313,6 @@ _work_frame_pop(void)
 
   wfp = wfp->prev;
 }
-#define WORK_FRAME_POP()  (_work_frame_pop())
 
 #define WORK(nm, i)  ((nm)->work[i])
 

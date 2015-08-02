@@ -133,13 +133,13 @@ method_bad_arg_err(obj_t arg)
 
   if (++err_depth > 1)  double_err();
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   inst_method_call(&WORK(work, 0), consts.str_tostring, 1, &arg);
 
   fprintf(stderr, "Bad argument: %s\n", STR(WORK(work, 0))->data);
 
-  WORK_FRAME_POP();
+  work_frame_pop();
   
   error();
 }
@@ -406,7 +406,7 @@ str_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 
   arg = va_arg(ap, obj_t);  --argc;
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   inst_method_call(&WORK(work, 0), consts.str_tostring, 1, &arg);
 
@@ -416,7 +416,7 @@ str_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
   STR(self)->data = ool_mem_alloc(STR(self)->size);
   memcpy(STR(self)->data, STR(WORK(work, 0))->data, STR(self)->size);
   
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   inst_init_parent(self, cl, argc, ap);
 }
@@ -430,7 +430,7 @@ str_newc(obj_t *result, unsigned argc, ...)
 
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   va_start(ap, argc);
 
@@ -458,7 +458,7 @@ str_newc(obj_t *result, unsigned argc, ...)
 
   obj_assign(result, WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 void
@@ -470,7 +470,7 @@ str_newv(obj_t *result, unsigned argc, obj_t *argv)
 
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   for (len = 1, p = argv, n = argc; n; --n, ++p) {
     len += STR(*p)->size - 1;
@@ -489,7 +489,7 @@ str_newv(obj_t *result, unsigned argc, obj_t *argv)
 
   obj_assign(result, WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 void
@@ -672,7 +672,7 @@ cm_str_set(void)
 {
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   inst_method_call(&WORK(work, 0), consts.str_eval, 1, &MC_ARG(1));
 
@@ -680,7 +680,7 @@ cm_str_set(void)
 
   obj_assign(MC_RESULT, WORK(work, 0));
   
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -690,7 +690,7 @@ dptr_new(obj_t *result, obj_t cl, obj_t car, obj_t cdr)
 {
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   inst_alloc(&WORK(work, 0), cl);
   obj_assign(&CAR(WORK(work, 0)), car);
@@ -698,7 +698,7 @@ dptr_new(obj_t *result, obj_t cl, obj_t car, obj_t cdr)
 
   obj_assign(result, WORK(work, 0));
   
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 void
@@ -726,7 +726,7 @@ cm_pair_tostring(void)
 {
   WORK_FRAME_DECL(work, 5);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   str_newc(&WORK(work, 0), 1, 2, "(");
   inst_method_call(&WORK(work, 1), consts.str_tostring, 1, &CAR(MC_ARG(0)));
@@ -736,7 +736,7 @@ cm_pair_tostring(void)
 
   str_newv(MC_RESULT, 5, &WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -774,7 +774,7 @@ cm_list_tostring(void)
 
   WORK_FRAME_DECL(work, 1 + nn);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   str_newc(&WORK(work, 0), 1, 2, " ");
 
@@ -792,7 +792,7 @@ cm_list_tostring(void)
 
   str_newv(MC_RESULT, nn, &WORK(work, 1));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -844,7 +844,7 @@ array_copy(obj_t *dst, obj_t src)
 
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   array_new(&WORK(work, 0), ARRAY(src)->size);
   
@@ -857,7 +857,7 @@ array_copy(obj_t *dst, obj_t src)
 
   obj_assign(dst, WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -891,7 +891,7 @@ dict_find(obj_t dict, obj_t key, obj_t **bucket)
 
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   inst_method_call(&WORK(work, 0), consts.str_hash, 1, &key);
   p = &DICT(dict)->base->base->data[INT(WORK(work, 0))->val & (DICT(dict)->base->base->size - 1)];
@@ -906,7 +906,7 @@ dict_find(obj_t dict, obj_t key, obj_t **bucket)
     }
   }
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (result);
 }
@@ -942,7 +942,7 @@ dict_at_put(obj_t dict, obj_t key, obj_t val)
   if (p == 0) {
     WORK_FRAME_DECL(work, 2);
 
-    WORK_FRAME_PUSH(work);
+    work_frame_push(work);
 
     pair_new(&WORK(work, 0), key, val);
     list_new(&WORK(work, 1), WORK(work, 0), *b);
@@ -951,7 +951,7 @@ dict_at_put(obj_t dict, obj_t key, obj_t val)
 
     ++DICT(dict)->base->cnt;
 
-    WORK_FRAME_POP();
+    work_frame_pop();
 
     return;
   }
@@ -1023,7 +1023,7 @@ cm_mc_eval(void)
   {
     WORK_FRAME_DECL(work, n);
 
-    WORK_FRAME_PUSH(work);
+    work_frame_push(work);
 
     for (p = METHOD_CALL(MC_ARG(0))->args, q = &WORK(work, 0), k = n;
 	 k > 0; 
@@ -1043,7 +1043,7 @@ cm_mc_eval(void)
       inst_method_call(MC_RESULT, sel, n, &WORK(work, 0));
     }
     
-    WORK_FRAME_POP();
+    work_frame_pop();
   }
 }
 
@@ -1059,7 +1059,7 @@ cm_mc_tostring(void)
 
   WORK_FRAME_DECL(work, 1 + nn);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   str_newc(&WORK(work, 0), 1, 2, " ");
 
@@ -1101,7 +1101,7 @@ cm_mc_tostring(void)
   
   str_newv(MC_RESULT, nn, &WORK(work, 1));
 
-  WORK_FRAME_POP();  
+  work_frame_pop();  
 }
 
 /***************************************************************************/
@@ -1142,7 +1142,7 @@ cm_blk_eval(void)
   if (!is_list(MC_ARG(1)))  method_bad_arg_err(MC_ARG(1));
   if (list_len(MC_ARG(1)) != BLOCK(MC_ARG(0))->argc)  method_argc_err();
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   strdict_new(&WORK(work, 0), 64);
 
@@ -1165,7 +1165,7 @@ cm_blk_eval(void)
     block_frame_pop();
   }
   
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -1193,14 +1193,14 @@ module_new(obj_t *dst, obj_t name, obj_t parent)
 {
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   inst_alloc(&WORK(work, 0), consts.cl_module);
   inst_init(WORK(work, 0), 2, name, parent);
 
   obj_assign(dst, WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 void
@@ -1253,7 +1253,7 @@ _method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *a
 
     WORK_FRAME_DECL(work, 2);
 
-    WORK_FRAME_PUSH(work);
+    work_frame_push(work);
 
     obj_assign(&WORK(work, 0), m);
 
@@ -1264,7 +1264,7 @@ _method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *a
 
     inst_method_call(result, consts.str_evalc, 2, &WORK(work, 0));
 
-    WORK_FRAME_POP();
+    work_frame_pop();
   } else {
     fprintf(stderr, "Invalid method definition\n");
 
@@ -1332,7 +1332,7 @@ backtrace(void)
 
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   for (p = mcfp; p; p = p->prev) {
     fprintf(stderr, "%s.%s.%s(",
@@ -1350,7 +1350,7 @@ backtrace(void)
     fprintf(stderr, ")\n");
   }
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 void
@@ -1499,7 +1499,7 @@ init(void)
 
   WORK_FRAME_DECL(work, 2);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   /* Create main module */
 
@@ -1568,7 +1568,7 @@ init(void)
     dict_at_put(consts.module_main, nm, cl);
   }
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 }
 
 int
@@ -1582,7 +1582,7 @@ main(void)
 
   module_frame_push(modfr, consts.module_main);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
 #if 1
   {
@@ -1636,7 +1636,7 @@ main(void)
   inst_method_call(&WORK(work, 2), WORK(work, 1), 1, &WORK(work, 0));
 #endif
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   module_frame_pop();
     

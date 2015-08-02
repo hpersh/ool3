@@ -206,7 +206,7 @@ parse_quote(obj_t *dst, struct stream *str)
 
   WORK_FRAME_DECL(work, 1);
   
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
   
   parse_ctxt_init(pc, str);
 
@@ -221,7 +221,7 @@ parse_quote(obj_t *dst, struct stream *str)
 
   parse_ctxt_fini(pc);
   
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (result);
 }
@@ -239,7 +239,7 @@ parse_pair_or_list(obj_t *dst, struct stream *str)
 
   WORK_FRAME_DECL(work, 2);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   parse_ctxt_init(pc, str);
     
@@ -279,7 +279,7 @@ parse_pair_or_list(obj_t *dst, struct stream *str)
   
   if (result)  obj_assign(dst, WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (result);
 }
@@ -296,7 +296,7 @@ parse_method_call(obj_t *dst, struct stream *str)
 
   WORK_FRAME_DECL(work, 3);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   parse_ctxt_init(pc, str);
 
@@ -336,7 +336,7 @@ parse_method_call(obj_t *dst, struct stream *str)
   
   if (result)  method_call_new(dst, WORK(work, 0), WORK(work, 1));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (result);
 }
@@ -353,7 +353,7 @@ parse_block(obj_t *dst, struct stream *str)
 
   WORK_FRAME_DECL(work, 3);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   parse_ctxt_init(pc, str);
 
@@ -387,7 +387,7 @@ parse_block(obj_t *dst, struct stream *str)
   
   if (result)  block_new(dst, WORK(work, 0), WORK(work, 1));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (result);
 }
@@ -400,7 +400,7 @@ parse_dot(obj_t *dst, struct stream *str)
 
   WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   parse_ctxt_init(pc, str);
 
@@ -418,7 +418,7 @@ parse_dot(obj_t *dst, struct stream *str)
 
   parse_ctxt_fini(pc);
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (result);
 }
@@ -431,7 +431,7 @@ parse_str(obj_t *dst, char *buf, unsigned len)
 
   WORK_FRAME_DECL(work, 2);
 
-  WORK_FRAME_PUSH(work);
+  work_frame_push(work);
 
   for (i = 0; len > 0; len -= n, buf += n, ++i) {
     p = index(buf, '.');
@@ -458,7 +458,7 @@ parse_str(obj_t *dst, char *buf, unsigned len)
 
   obj_assign(dst, WORK(work, 0));
 
-  WORK_FRAME_POP();
+  work_frame_pop();
 
   return (true);
 }
@@ -492,7 +492,7 @@ parse_token(obj_t *dst, struct stream *str, char *buf, unsigned len)
   if (len >= 2 && buf[0] == '`') {
     WORK_FRAME_DECL(work, 1);
 
-    WORK_FRAME_PUSH(work);
+    work_frame_push(work);
 
     buf[len - 2] = 0;
     str_newc(&WORK(work, 0), 1, len - 2, buf + 1);
@@ -503,7 +503,7 @@ parse_token(obj_t *dst, struct stream *str, char *buf, unsigned len)
     
     obj_assign(dst, WORK(work, 0));
     
-    WORK_FRAME_POP();
+    work_frame_pop();
 
     return (true);
   }
