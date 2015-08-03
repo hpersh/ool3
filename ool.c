@@ -1308,8 +1308,13 @@ void
 inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv)
 {
   obj_t cl;
-  obj_t m = method_find(inst_of(argv[0]), offsetof(struct class, inst_methods), sel, &cl);
+  obj_t m;
   struct method_call_frame mcfr[1];
+
+  m = method_find(inst_of(argv[0]), offsetof(struct class, inst_methods), sel, &cl);
+  if (m == 0 && inst_of(argv[0]) == consts.metaclass) {
+    m = method_find(inst_of(argv[0]), offsetof(struct class, cl_methods), sel, &cl);
+  }
 
   method_call_frame_push(mcfr, result, cl, sel, argc, argv);
 
@@ -1335,6 +1340,14 @@ cm_metaclass_tostring(void)
 void
 cm_metaclass_new(void)
 {
+}
+
+/***************************************************************************/
+
+void
+cm_system_dump(void)
+{
+  printf("System dump\n");
 }
 
 /***************************************************************************/
@@ -1392,6 +1405,7 @@ struct {
   { &consts.str_copy,        "copy" },
   { &consts.str_dict,        "#Dictionary" },
   { &consts.str_dptr,        "#Dptr" },
+  { &consts.str_dump,        "dump" },
   { &consts.str_equalc,      "equal:" },
   { &consts.str_eval,        "eval" },
   { &consts.str_evalc,       "eval:" },
@@ -1410,6 +1424,7 @@ struct {
   { &consts.str_set,         "#Set" },
   { &consts.str_setc,        "&set:" },
   { &consts.str_string,      "#String" },
+  { &consts.str_system,      "#System" },
   { &consts.str_tostring,    "tostring" }
 };
 
@@ -1436,7 +1451,8 @@ struct {
   { &consts.cl_code_method, &consts.str_code_method, &consts.cl_object,                   0, sizeof(struct inst_code_method), code_method_init },
   { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object,                   0, sizeof(struct inst_method_call), method_call_init, method_call_walk },
   { &consts.cl_block,       &consts.str_block,       &consts.cl_object,                   0,       sizeof(struct inst_block),       block_init,       block_walk },
-  { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,                     0,      sizeof(struct inst_module),      module_init,      module_walk }
+  { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,                     0,      sizeof(struct inst_module),      module_init,      module_walk },
+  { &consts.cl_system,      &consts.str_system,      &consts.cl_object, CLASS_FLAG_ABSTRACT }
 };
 
 struct {
@@ -1471,7 +1487,9 @@ struct {
 
   { &consts.cl_module, offsetof(struct class, inst_methods), &consts.str_tostring, cm_module_tostring },
 
-  { &consts.cl_block, offsetof(struct class, inst_methods), &consts.str_evalc, cm_blk_eval }
+  { &consts.cl_block, offsetof(struct class, inst_methods), &consts.str_evalc, cm_blk_eval },
+
+  { &consts.cl_system, offsetof(struct class, cl_methods), &consts.str_dump, cm_system_dump },  
 };
 
 

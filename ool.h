@@ -202,6 +202,7 @@ struct {
   obj_t str_copy;
   obj_t str_dict;
   obj_t str_dptr;
+  obj_t str_dump;
   obj_t str_equalc;
   obj_t str_eval;
   obj_t str_evalc;
@@ -220,6 +221,7 @@ struct {
   obj_t str_set;
   obj_t str_setc;
   obj_t str_string;
+  obj_t str_system;
   obj_t str_tostring;
 
   obj_t metaclass;
@@ -237,6 +239,7 @@ struct {
   obj_t cl_block;
   obj_t cl_method_call;
   obj_t cl_module;
+  obj_t cl_system;
 
   obj_t module_main;
 } consts;
