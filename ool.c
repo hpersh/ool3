@@ -1630,7 +1630,16 @@ main(void)
     parse_ctxt_init(pc, str->base);
 
     for (;;) {
-      parse(&WORK(work, 0), pc);
+      unsigned ret;
+
+      
+      ret = parse(&WORK(work, 0), pc);
+      if (ret == PARSE_EOF)  break;
+      if (ret == PARSE_ERR) {
+	printf("Syntax error\n"); 
+
+	continue;
+      }
 
       inst_method_call(&WORK(work, 1), consts.str_eval, 1, &WORK(work, 0));
       inst_method_call(&WORK(work, 2), consts.str_tostring, 1, &WORK(work, 1));

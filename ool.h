@@ -418,4 +418,8 @@ struct parse_ctxt {
 void parse_ctxt_init(struct parse_ctxt *pc, struct stream *str);
 void parse_ctxt_fini(struct parse_ctxt *pc);
 
+enum {
+  PARSE_EOF, PARSE_OK, PARSE_ERR
+};
+
 unsigned parse(obj_t *dst, struct parse_ctxt *pc);

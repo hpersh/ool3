@@ -125,7 +125,7 @@ tokbuf_len(struct tokbuf *tb)
 unsigned
 token_get(struct stream *str, struct tokbuf *tb)
 {
-  unsigned result = false;
+  unsigned result = false, eof = false;
   char     c;
 
   tokbuf_fini(tb);
@@ -134,6 +134,7 @@ token_get(struct stream *str, struct tokbuf *tb)
   for (;;) {
     c = stream_getc(str);
     if (c < 0) {
+      eof    = true;
       result = true;
 
       goto done;
@@ -189,7 +190,11 @@ token_get(struct stream *str, struct tokbuf *tb)
   }
 
  done:
-  if (result)  tokbuf_append_char(tb, 0);  else  tokbuf_fini(tb);
+  if (result) {
+    if (!eof)  tokbuf_append_char(tb, 0);
+  } else {
+    tokbuf_fini(tb);
+  }
   
   return (result);
 }
@@ -257,10 +262,17 @@ parse_pair_or_list(obj_t *dst, struct stream *str)
       continue;
     }
 
-    if (n == 2 && t[0] == ')') {
-      result = true;
-      
-      break;
+    if (n == 2) {
+      if (t[0] == ')') {
+	result = true;
+	
+	break;
+      }
+
+      if (t[0] == ']' || t[0] =='}') {
+	break;
+      }
+	
     }
 
     if (pairf && i > 2)  break;
@@ -306,10 +318,16 @@ parse_method_call(obj_t *dst, struct stream *str)
     t = tokbuf_data(pc->tb);
     n = tokbuf_len(pc->tb);
 
-    if (n == 2 && t[0] == ']') {
-      result = true;
-      
-      break;
+    if (n == 2) {
+      if (t[0] == ']') {
+	result = true;
+	
+	break;
+      }
+
+      if (t[0] == ')' || t[0] =='}') {
+	break;
+      }
     }
 
     if (!parse_token(&WORK(work, 2), str, t, n))  break;
@@ -363,10 +381,16 @@ parse_block(obj_t *dst, struct stream *str)
     t = tokbuf_data(pc->tb);
     n = tokbuf_len(pc->tb);
 
-    if (n == 2 && t[0] == '}') {
-      result = true;
-      
-      break;
+    if (n == 2){
+      if (t[0] == '}') {
+	result = true;
+	
+	break;
+      }
+
+      if (t[0] == ')' || t[0] == ']') {
+	break;
+      }
     }
 
     if (!parse_token(&WORK(work, 2), str, t, n))  break;
@@ -557,10 +581,12 @@ parse(obj_t *dst, struct parse_ctxt *pc)
   result = token_get(pc->str, pc->tb);
   
   if (result) {
+    if (tokbuf_len(pc->tb) == 0)  return (PARSE_EOF);
+
     result = parse_token(dst, pc->str, tokbuf_data(pc->tb), tokbuf_len(pc->tb));
   }
 
-  return (result);
+  return (result ? PARSE_OK : PARSE_ERR);
 }
 
 
