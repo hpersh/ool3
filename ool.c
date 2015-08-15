@@ -1014,8 +1014,16 @@ method_call_walk(obj_t obj, void (*func)(obj_t))
 void
 method_call_new(obj_t *dst, obj_t sel, obj_t args)
 {
-  inst_alloc(dst, consts.cl_method_call);
-  inst_init(*dst, 2, sel, args);
+  WORK_FRAME_DECL(work, 1);
+
+  work_frame_push(work);
+  
+  inst_alloc(&WORK(work, 0), consts.cl_method_call);
+  inst_init(WORK(work, 0), 2, sel, args);
+
+  obj_assign(dst, WORK(work, 0));
+
+  work_frame_pop();
 }
 
 void
@@ -1144,8 +1152,16 @@ block_walk(obj_t obj, void (*func)(obj_t))
 void
 block_new(obj_t *dst, obj_t args, obj_t body)
 {
-  inst_alloc(dst, consts.cl_block);
-  inst_init(*dst, 2, args, body);
+  WORK_FRAME_DECL(work, 1);
+
+  work_frame_push(work);
+  
+  inst_alloc(&WORK(work, 0), consts.cl_block);
+  inst_init(WORK(work, 0), 2, args, body);
+
+  obj_assign(dst, WORK(work, 0));
+
+  work_frame_pop();
 }
 
 void
