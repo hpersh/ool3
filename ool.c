@@ -774,17 +774,22 @@ pair_new(obj_t *result, obj_t car, obj_t cdr)
 void
 cm_pair_tostring(void)
 {
-  WORK_FRAME_DECL(work, 5);
+  obj_t *a;
+
+  WORK_FRAME_DECL(work, 1);
 
   work_frame_push(work);
 
-  str_newc(&WORK(work, 0), 1, 2, "(");
-  inst_method_call(&WORK(work, 1), consts.str_tostring, 1, &CAR(MC_ARG(0)));
-  str_newc(&WORK(work, 2), 1, 3, ", ");
-  inst_method_call(&WORK(work, 3), consts.str_tostring, 1, &CDR(MC_ARG(0)));
-  str_newc(&WORK(work, 4), 1, 2, ")");
+  array_new(&WORK(work, 0), 5);
+  a = ARRAY(WORK(work, 0))->data;
 
-  str_newv(MC_RESULT, 5, &WORK(work, 0));
+  str_newc(&a[0], 1, 2, "(");
+  inst_method_call(&a[1], consts.str_tostring, 1, &CAR(MC_ARG(0)));
+  str_newc(&a[2], 1, 3, ", ");
+  inst_method_call(&a[3], consts.str_tostring, 1, &CDR(MC_ARG(0)));
+  str_newc(&a[4], 1, 2, ")");
+
+  str_newv(MC_RESULT, 5, a);
 
   work_frame_pop();
 }
@@ -817,32 +822,36 @@ void
 cm_list_tostring(void)
 {
   unsigned n, nn, i;
-  obj_t    p, *q;
+  obj_t    p, *a, *q;
 
   n = list_len(MC_ARG(0));
   nn = 1 + (n > 1 ? 2 * n - 1 : n) + 1;
+  
+  {
+    WORK_FRAME_DECL(work, 1);
 
-  WORK_FRAME_DECL(work, 1 + nn);
+    work_frame_push(work);
 
-  work_frame_push(work);
+    array_new(&WORK(work, 0), 1 + nn);
+    a = ARRAY(WORK(work, 0))->data;
 
-  str_newc(&WORK(work, 0), 1, 2, " ");
+    q = a;
+    str_newc(q, 1, 2, " ");  ++q;
 
-  q = &WORK(work, 1);
-
-  str_newc(q, 1, 2, "(");  ++q;
-  for (i = 0, p = MC_ARG(0); p; p = CDR(p), ++i) {
-    if (i > 0) {
-      obj_assign(q, WORK(work, 0));  ++q;
+    str_newc(q, 1, 2, "(");  ++q;
+    for (i = 0, p = MC_ARG(0); p; p = CDR(p), ++i) {
+      if (i > 0) {
+	obj_assign(q, a[0]);  ++q;
+      }
+      
+      inst_method_call(q, consts.str_tostring, 1, &CAR(p));  ++q;
     }
+    str_newc(q, 1, 2, ")");
     
-    inst_method_call(q, consts.str_tostring, 1, &CAR(p));  ++q;
+    str_newv(MC_RESULT, nn, a + 1);
+    
+    work_frame_pop();
   }
-  str_newc(q, 1, 2, ")");
-
-  str_newv(MC_RESULT, nn, &WORK(work, 1));
-
-  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -1109,57 +1118,61 @@ void
 cm_mc_tostring(void)
 {
   unsigned n, nn, k, i;
-  obj_t    p, *q;
+  obj_t    p, *a, *q;
   char     *r, *rr;
 
   n = list_len(METHOD_CALL(MC_ARG(0))->args);
   nn = 1 + (n > 1 ? 4 * n - 3 : 4 * n - 1) + 1;
 
-  WORK_FRAME_DECL(work, 1 + nn);
-
-  work_frame_push(work);
-
-  str_newc(&WORK(work, 0), 1, 2, " ");
-
-  q = &WORK(work, 1);
-
-  r = STR(METHOD_CALL(MC_ARG(0))->sel)->data;
-  str_newc(q, 1, 2, "[");  ++q;
-  for (i = 0, p = METHOD_CALL(MC_ARG(0))->args; i < 2 || p != 0; ++i) {
-    if (i > 0) {
-      obj_assign(q, WORK(work, 0));  ++q;
-    }
-
-    if (i & 1) {
-      if ((rr = index(r, ':')) != 0) {
-	++rr;
-
-	{
-	  unsigned ss = rr - r;
-	  char     buf[ss + 1];
-	  
-	  memcpy(buf, r, ss);
-	  buf[ss] = 0;
-	  str_newc(q, 1, ss + 1, buf);
-	  
-	  r = rr;
-	}
-      } else {
-	str_newc(q, 1, strlen(r) + 1, r);
+  {
+    WORK_FRAME_DECL(work, 1);
+    
+    work_frame_push(work);
+   
+    array_new(&WORK(work, 0), 1 + nn);
+    a = ARRAY(WORK(work, 0))->data;
+ 
+    q = a;
+    str_newc(q, 1, 2, " ");  ++q;
+    
+    r = STR(METHOD_CALL(MC_ARG(0))->sel)->data;
+    str_newc(q, 1, 2, "[");  ++q;
+    for (i = 0, p = METHOD_CALL(MC_ARG(0))->args; i < 2 || p != 0; ++i) {
+      if (i > 0) {
+	obj_assign(q, a[0]);  ++q;
       }
-
-      ++q;
-
-      continue;
+      
+      if (i & 1) {
+	if ((rr = index(r, ':')) != 0) {
+	  ++rr;
+	  
+	  {
+	    unsigned ss = rr - r;
+	    char     buf[ss + 1];
+	    
+	    memcpy(buf, r, ss);
+	    buf[ss] = 0;
+	    str_newc(q, 1, ss + 1, buf);
+	    
+	    r = rr;
+	  }
+	} else {
+	  str_newc(q, 1, strlen(r) + 1, r);
+	}
+	
+	++q;
+	
+	continue;
+      }
+      
+      inst_method_call(q, consts.str_tostring, 1, &CAR(p));  ++q;  p = CDR(p);
     }
-
-    inst_method_call(q, consts.str_tostring, 1, &CAR(p));  ++q;  p = CDR(p);
+    str_newc(q, 1, 2, "]");
+    
+    str_newv(MC_RESULT, nn, &a[1]);
+    
+    work_frame_pop();  
   }
-  str_newc(q, 1, 2, "]");
-  
-  str_newv(MC_RESULT, nn, &WORK(work, 1));
-
-  work_frame_pop();  
 }
 
 /***************************************************************************/

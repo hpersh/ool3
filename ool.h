@@ -188,6 +188,7 @@ void  bool_new(obj_t *dst, unsigned val);
 void  int_new(obj_t *dst, intval_t val);
 void  pair_new(obj_t *dst, obj_t first, obj_t second);
 void  list_new(obj_t *dst, obj_t car, obj_t cdr);
+void  array_new(obj_t *dst, unsigned size);
 void  method_call_new(obj_t *dst, obj_t sel, obj_t args);
 void  block_new(obj_t *dst, obj_t args, obj_t body);
 void  module_new(obj_t *dst, obj_t name, obj_t parent);
