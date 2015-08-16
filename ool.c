@@ -225,6 +225,8 @@ inst_alloc(obj_t *dst, obj_t cl)
     list_erase(q);
 
     p = CONTAINER_OF(q, struct obj, list_node);
+
+    memset(p, 0, size);
   }
 
   obj_assign(&p->inst_of, cl);

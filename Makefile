@@ -1,10 +1,11 @@
+CC	= gcc
 SRCS	= ool.c parse.c
 
 all:
-	clang -O3 -fomit-frame-pointer $(SRCS)
+	$(CC) -O3 -fomit-frame-pointer $(SRCS)
 
 debug:
-	clang -g $(SRCS)
+	$(CC) -g $(SRCS)
 
 clean:
 	rm *~ a.out
