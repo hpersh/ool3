@@ -211,16 +211,17 @@ inst_alloc(obj_t *dst, obj_t cl)
 {
   obj_t    p;
   unsigned size = CLASS(cl)->inst_size;
+  obj_t    b = base_class_same_inst_size(cl);
 
   if (CLASS(cl)->flags & CLASS_FLAG_ABSTRACT) {
     fprintf(stderr, "Cannot instantiate class %s\n", STR(CLASS(cl)->name)->data);
     error();
   }
 
-  if (list_empty(CLASS(cl)->inst_cache)) {
+  if (list_empty(CLASS(b)->inst_cache)) {
     p = (obj_t) ool_mem_allocz(size);
   } else {
-    struct list *q = list_first(CLASS(cl)->inst_cache);
+    struct list *q = list_first(CLASS(b)->inst_cache);
 
     list_erase(q);
 
