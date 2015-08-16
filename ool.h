@@ -210,6 +210,7 @@ struct {
   obj_t str_inst_of;
   obj_t str_integer;
   obj_t str_list;
+  obj_t str_ltc;
   obj_t str_main;
   obj_t str_metaclass;
   obj_t str_method_call;
@@ -223,6 +224,7 @@ struct {
   obj_t str_string;
   obj_t str_system;
   obj_t str_tostring;
+  obj_t str_whilec;
 
   obj_t metaclass;
   obj_t cl_object;

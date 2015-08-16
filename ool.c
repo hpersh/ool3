@@ -322,6 +322,27 @@ cm_obj_tostring(void)
   str_newc(MC_RESULT, 1, 5, "#nil");
 }
 
+void
+cm_obj_while(void)
+{
+  if (MC_ARGC != 2)  method_argc_err();
+
+  {
+    WORK_FRAME_DECL(work, 2);
+
+    work_frame_push(work);
+
+    for (;;) {
+      inst_method_call(&WORK(work, 0), consts.str_eval, 1, &MC_ARG(0));
+      if (inst_of(WORK(work, 0)) == consts.cl_bool && !BOOL(WORK(work, 0))->val)  break;
+
+      inst_method_call(&WORK(work, 1), consts.str_eval, 1, &MC_ARG(1));      
+    }
+
+    obj_assign(MC_RESULT, WORK(work, 1));
+  }
+}
+
 /***************************************************************************/
 
 void
@@ -397,6 +418,16 @@ cm_int_add(void)
   if (inst_of(MC_ARG(1)) != consts.cl_int)  method_bad_arg_err(MC_ARG(1));
 
   int_new(MC_RESULT, INT(MC_ARG(0))->val + INT(MC_ARG(1))->val);
+}
+
+void
+cm_int_lt(void)
+{
+  if (MC_ARGC != 2)  method_argc_err();
+  if (inst_of(MC_ARG(0)) != consts.cl_int)  method_bad_arg_err(MC_ARG(0));
+  if (inst_of(MC_ARG(1)) != consts.cl_int)  method_bad_arg_err(MC_ARG(1));
+
+  bool_new(MC_RESULT, INT(MC_ARG(0))->val < INT(MC_ARG(1))->val);
 }
 
 void
@@ -1432,6 +1463,7 @@ struct {
   { &consts.str_inst_of,     "instance-of" },
   { &consts.str_integer,     "#Integer" },
   { &consts.str_list,        "#List" },
+  { &consts.str_ltc,         "lt:" },
   { &consts.str_main,        "#main" },
   { &consts.str_metaclass,   "#Metaclass" },
   { &consts.str_method_call, "#Method_Call" },
@@ -1444,7 +1476,8 @@ struct {
   { &consts.str_setc,        "&set:" },
   { &consts.str_string,      "#String" },
   { &consts.str_system,      "#System" },
-  { &consts.str_tostring,    "tostring" }
+  { &consts.str_tostring,    "tostring" },
+  { &consts.str_whilec,      "&while:" }
 };
 
 struct {
@@ -1489,8 +1522,10 @@ struct {
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_eval,     cm_obj_eval },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_copy,     cm_obj_copy },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_tostring, cm_obj_tostring },
+  { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_whilec,   cm_obj_while },
 
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_addc,     cm_int_add },
+  { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_ltc,      cm_int_lt },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_tostring, cm_int_tostring },
 
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_eval,     cm_str_eval },
