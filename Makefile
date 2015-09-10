@@ -1,4 +1,4 @@
-CC	= gcc
+CC	= clang
 SRCS	= ool.c parse.c
 
 all:

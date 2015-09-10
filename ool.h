@@ -168,7 +168,7 @@ struct class {
     CLASS_FLAG_ABSTRACT = 1 << 0
   }           flags;
   unsigned    inst_size;
-  struct list inst_cache[1];
+  struct list _inst_cache[1], *inst_cache;
   void        (*init)(obj_t self, obj_t cl, unsigned argc, va_list ap);
   void        (*walk)(obj_t obj, void (*func)(obj_t obj));
   void        (*free)(obj_t obj);

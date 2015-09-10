@@ -210,18 +210,21 @@ void
 inst_alloc(obj_t *dst, obj_t cl)
 {
   obj_t    p;
-  unsigned size = CLASS(cl)->inst_size;
-  obj_t    b = base_class_same_inst_size(cl);
+  unsigned size;
+  struct list *inst_cache;
 
   if (CLASS(cl)->flags & CLASS_FLAG_ABSTRACT) {
     fprintf(stderr, "Cannot instantiate class %s\n", STR(CLASS(cl)->name)->data);
     error();
   }
 
-  if (list_empty(CLASS(b)->inst_cache)) {
+  size       = CLASS(cl)->inst_size;
+  inst_cache = CLASS(cl)->inst_cache;
+
+  if (list_empty(inst_cache)) {
     p = (obj_t) ool_mem_allocz(size);
   } else {
-    struct list *q = list_first(CLASS(b)->inst_cache);
+    struct list *q = list_first(inst_cache);
 
     list_erase(q);
 
@@ -275,7 +278,7 @@ object_free(obj_t obj)
 
   obj_release(cl);
   
-  list_insert(obj->list_node, CLASS(base_class_same_inst_size(cl))->inst_cache);
+  list_insert(obj->list_node, CLASS(cl)->inst_cache);
 }
 
 void
@@ -1627,7 +1630,8 @@ init(void)
     obj_assign(&CLASS(cl)->parent, init_cl_tbl[i].parent ? *init_cl_tbl[i].parent : 0);
     CLASS(cl)->flags     = init_cl_tbl[i].flags;
     CLASS(cl)->inst_size = init_cl_tbl[i].inst_size;
-    list_init(CLASS(cl)->inst_cache);
+    list_init(CLASS(cl)->_inst_cache);
+    CLASS(cl)->inst_cache = CLASS(base_class_same_inst_size(cl))->_inst_cache;
     CLASS(cl)->init = init_cl_tbl[i].init;
     CLASS(cl)->walk = init_cl_tbl[i].walk;
     CLASS(cl)->free = init_cl_tbl[i].free;
