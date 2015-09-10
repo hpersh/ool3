@@ -368,6 +368,31 @@ bool_new(obj_t *dst, unsigned val)
 }
 
 void
+cm_bool_new(void)
+{
+  obj_t    cl;
+  unsigned val = 0;
+
+  if (MC_ARGC < 1 || MC_ARGC > 2)  method_argc_err();
+  
+  if (MC_ARGC == 2 && MC_ARG(1) != 0) {
+    cl = inst_of(MC_ARG(1));
+
+    if (cl == consts.cl_bool) {
+      obj_assign(MC_RESULT, MC_ARG(1));
+      
+      return;
+    } else if (cl == consts.cl_int) {
+      val = (INT(MC_ARG(1))->val != 0);
+    } else if (cl == consts.cl_list) {
+      val = 1;
+    } else  method_bad_arg_err(MC_ARG(1));
+  }
+	       
+  bool_new(MC_RESULT, val);
+}
+
+void
 cm_bool_and(void)
 {
   if (MC_ARGC != 2)  method_argc_err();
@@ -1381,7 +1406,7 @@ inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv)
 
   m = method_find(inst_of(argv[0]), offsetof(struct class, inst_methods), sel, &cl);
   if (m == 0 && inst_of(argv[0]) == consts.metaclass) {
-    m = method_find(inst_of(argv[0]), offsetof(struct class, cl_methods), sel, &cl);
+    m = method_find(argv[0], offsetof(struct class, cl_methods), sel, &cl);
   }
 
   method_call_frame_push(mcfr, result, cl, sel, argc, argv);
@@ -1486,6 +1511,8 @@ struct {
   { &consts.str_metaclass,   "#Metaclass" },
   { &consts.str_method_call, "#Method_Call" },
   { &consts.str_module,      "#Module" },
+  { &consts.str_new,         "new" },
+  { &consts.str_newc,        "new:" },
   { &consts.str_newc_instance_variablesc, "new:instance-variables:" },
   { &consts.str_object,      "#Object" },
   { &consts.str_pair,        "#Pair" },
@@ -1541,6 +1568,9 @@ struct {
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_copy,     cm_obj_copy },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_tostring, cm_obj_tostring },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_whilec,   cm_obj_while },
+
+  { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_new,  cm_bool_new },
+  { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_newc, cm_bool_new },
 
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_addc,     cm_int_add },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_ltc,      cm_int_lt },
