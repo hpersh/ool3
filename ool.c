@@ -340,6 +340,8 @@ cm_obj_while(void)
     }
 
     obj_assign(MC_RESULT, WORK(work, 1));
+
+    work_frame_pop();
   }
 }
 
