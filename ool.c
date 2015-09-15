@@ -368,27 +368,25 @@ bool_new(obj_t *dst, unsigned val)
 }
 
 void
-cm_bool_new(void)
+cm_bool_newc(void)
 {
   obj_t    cl;
   unsigned val = 0;
 
-  if (MC_ARGC < 1 || MC_ARGC > 2)  method_argc_err();
+  if (MC_ARGC != 2)  method_argc_err();
   
-  if (MC_ARGC == 2 && MC_ARG(1) != 0) {
-    cl = inst_of(MC_ARG(1));
-
-    if (cl == consts.cl_bool) {
-      obj_assign(MC_RESULT, MC_ARG(1));
-      
-      return;
-    }
-    if (cl == consts.cl_int) {
-      val = (INT(MC_ARG(1))->val != 0);
-    } else if (cl == consts.cl_list) {
-      val = 1;
-    } else  method_bad_arg_err(MC_ARG(1));
+  cl = inst_of(MC_ARG(1));
+  
+  if (cl == consts.cl_bool) {
+    obj_assign(MC_RESULT, MC_ARG(1));
+    
+    return;
   }
+  if (cl == consts.cl_int) {
+    val = (INT(MC_ARG(1))->val != 0);
+  } else if (cl == consts.cl_list) {
+    val = 1;
+  } else  method_bad_arg_err(MC_ARG(1));
 	       
   bool_new(MC_RESULT, val);
 }
@@ -1455,6 +1453,7 @@ cm_metaclass_tostring(void)
 void
 cm_metaclass_new(void)
 {
+  inst_alloc(MC_RESULT, MC_ARG(0));
 }
 
 /***************************************************************************/
@@ -1662,7 +1661,8 @@ struct {
 } init_method_tbl[] = {
   { &consts.metaclass, offsetof(struct class, cl_methods), &consts.str_newc_instance_variablesc,  cm_metaclass_new },
 
-  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_tostring,  cm_metaclass_tostring },
+  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_new,      cm_metaclass_new },
+  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_tostring, cm_metaclass_tostring },
 
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_inst_of,  cm_obj_inst_of },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_quote,    cm_obj_quote },
@@ -1671,8 +1671,7 @@ struct {
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_tostring, cm_obj_tostring },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_whilec,   cm_obj_while },
 
-  { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_new,  cm_bool_new },
-  { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_newc, cm_bool_new },
+  { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_newc, cm_bool_newc },
 
   { &consts.cl_bool, offsetof(struct class, inst_methods), &consts.str_tostring, cm_bool_tostring },
 
