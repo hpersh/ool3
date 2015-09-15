@@ -94,6 +94,7 @@ struct inst_float {
   struct obj base[1];
   floatval_t val;
 };
+#define FLOAT(x)  ((struct inst_float *)(x))
 
 struct inst_str {
   struct obj base[1];
@@ -197,16 +198,20 @@ struct {
   obj_t str_addc;
   obj_t str_array;
   obj_t str_atc;
+  obj_t str_atc_putc;
   obj_t str_block;
   obj_t str_boolean;
   obj_t str_code_method;
   obj_t str_copy;
+  obj_t str_defc_putc;
   obj_t str_dict;
   obj_t str_dptr;
   obj_t str_dump;
+  obj_t str_env;
   obj_t str_equalc;
   obj_t str_eval;
   obj_t str_evalc;
+  obj_t str_float;
   obj_t str_hash;
   obj_t str_inst_of;
   obj_t str_integer;
@@ -233,6 +238,7 @@ struct {
   obj_t cl_object;
   obj_t cl_bool;
   obj_t cl_int;
+  obj_t cl_float;
   obj_t cl_str;
   obj_t cl_dptr;
   obj_t cl_pair;
@@ -244,6 +250,7 @@ struct {
   obj_t cl_block;
   obj_t cl_method_call;
   obj_t cl_module;
+  obj_t cl_env;
   obj_t cl_system;
 
   obj_t module_main;

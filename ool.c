@@ -382,7 +382,8 @@ cm_bool_new(void)
       obj_assign(MC_RESULT, MC_ARG(1));
       
       return;
-    } else if (cl == consts.cl_int) {
+    }
+    if (cl == consts.cl_int) {
       val = (INT(MC_ARG(1))->val != 0);
     } else if (cl == consts.cl_list) {
       val = 1;
@@ -390,6 +391,39 @@ cm_bool_new(void)
   }
 	       
   bool_new(MC_RESULT, val);
+}
+
+void
+cm_bool_tostring(void)
+{
+  char *s;
+
+  if (MC_ARGC != 1)  method_argc_err();
+  if (inst_of(MC_ARG(0)) != consts.cl_bool)  method_bad_arg_err(MC_ARG(0));
+
+  s = BOOL(MC_ARG(0))->val ? "#true" : "#false";
+  str_newc(MC_RESULT, 1, strlen(s) + 1, s);
+}
+
+void
+cm_bool_eq(void)
+{
+  if (MC_ARGC != 2)  method_argc_err();
+  if (inst_of(MC_ARG(0)) != consts.cl_bool)  method_bad_arg_err(MC_ARG(0));
+
+  bool_new(MC_RESULT,
+	   inst_of(MC_ARG(1)) == consts.cl_bool
+	   && BOOL(MC_ARG(0))->val == BOOL(MC_ARG(1))->val
+	   );
+}
+
+void
+cm_bool_hash(void)
+{
+  if (MC_ARGC != 1)  method_argc_err();
+  if (inst_of(MC_ARG(0)) != consts.cl_bool)  method_bad_arg_err(MC_ARG(0));
+
+  int_new(MC_RESULT, BOOL(MC_ARG(0))->val);
 }
 
 void
@@ -441,6 +475,44 @@ int_new(obj_t *dst, intval_t val)
 }
 
 void
+cm_int_new(void)
+{
+  intval_t val = 0;
+
+  if (MC_ARGC < 1 || MC_ARGC > 2)  method_argc_err();
+
+  if (MC_ARGC == 2) {
+    obj_t cl;
+
+    if (MC_ARG(1) == 0)  method_bad_arg_err(MC_ARG(1));
+
+    cl = inst_of(MC_ARG(1));
+    if (cl == consts.cl_int) {
+      obj_assign(MC_RESULT, MC_ARG(1));
+
+      return;
+    }
+    if (cl == consts.cl_float) {
+      val = (intval_t) FLOAT(MC_ARG(1))->val;
+    } else  method_bad_arg_err(MC_ARG(1));
+  }
+
+  int_new(MC_RESULT, val);
+}
+
+void
+cm_int_eq(void)
+{
+  if (MC_ARGC != 2)  method_argc_err();
+  if (inst_of(MC_ARG(0)) != consts.cl_int)  method_bad_arg_err(MC_ARG(0));
+
+  bool_new(MC_RESULT,
+	   inst_of(MC_ARG(1)) == consts.cl_int
+	   && INT(MC_ARG(0))->val == INT(MC_ARG(1))->val
+	   );
+}
+
+void
 cm_int_add(void)
 {
   if (MC_ARGC != 2)  method_argc_err();
@@ -471,6 +543,25 @@ cm_int_tostring(void)
   snprintf(buf, sizeof(buf), "%lld", INT(MC_ARG(0))->val);
   
   str_newc(MC_RESULT, 1, strlen(buf) + 1, buf);
+}
+
+/***************************************************************************/
+
+void
+float_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
+{
+  assert(argc > 0);
+
+  FLOAT(self)->val = va_arg(ap, floatval_t);  --argc;
+
+  inst_init_parent(self, cl, argc, ap);
+}
+
+void
+float_new(obj_t *dst, floatval_t val)
+{
+  inst_alloc(dst, consts.cl_float);
+  inst_init(*dst, 1, val);
 }
 
 /***************************************************************************/
@@ -648,68 +739,6 @@ strdict_new(obj_t *dst, unsigned size)
 }
 
 
-obj_t
-str_env_find(obj_t s)
-{
-  obj_t d, q;
-
-  {
-    struct block_frame *p;
-
-    for (p = blkfp; p; p = p->prev) {
-      if ((q = dict_at(d = p->dict, s)) != 0) {
-	return (q);
-      }
-    }
-  }
-
-  {
-    struct module_frame *p;
-    
-    for (p = modfp; p; p = p->prev) {
-      if ((q = dict_at(d = OBJ(MODULE(p->module)->base), s)) != 0) {
-	return (q);
-      }
-    }
-  }
-
-  return (0);
-}
-
-obj_t
-str_env_top(void)
-{
-  return (blkfp ? blkfp->dict : OBJ(MODULE(modfp->module)->base));
-}
-
-obj_t
-str_eval(obj_t s)
-{
-  obj_t p;
-
-  if ((p = str_env_find(s)) != 0)  return (CDR(p));
-
-  fprintf(stderr, "Variable not bound: %s\n", STR(s)->data);
-
-  error();
-
-  return (0);
-}
-
-void
-str_bind(obj_t s, obj_t val)
-{
-  obj_t p;
-
-  if ((p = str_env_find(s)) != 0) {
-    obj_assign(&CDR(p), val);
-
-    return;
-  }
-
-  dict_at_put(str_env_top(), s, val);
-}
-
 void
 cm_str_hash(void)
 {
@@ -741,25 +770,18 @@ cm_str_tostring(void)
 void
 cm_str_eval(void)
 {
+  WORK_FRAME_DECL(work, 2);
+
   if (MC_ARGC != 1)                         method_argc_err();
   if (inst_of(MC_ARG(0)) != consts.cl_str)  method_bad_arg_err(MC_ARG(0));
 
-  obj_assign(MC_RESULT, str_eval(MC_ARG(0)));
-}
-
-void
-cm_str_set(void)
-{
-  WORK_FRAME_DECL(work, 1);
-
   work_frame_push(work);
 
-  inst_method_call(&WORK(work, 0), consts.str_eval, 1, &MC_ARG(1));
+  obj_assign(&WORK(work, 0), consts.cl_env);
+  obj_assign(&WORK(work, 1), MC_ARG(0));
 
-  str_bind(MC_ARG(0), WORK(work, 0));
+  inst_method_call(MC_RESULT, consts.str_atc, 2, &WORK(work, 0));
 
-  obj_assign(MC_RESULT, WORK(work, 0));
-  
   work_frame_pop();
 }
 
@@ -1437,6 +1459,80 @@ cm_metaclass_new(void)
 
 /***************************************************************************/
 
+obj_t
+env_find(obj_t s)
+{
+  obj_t d, q;
+
+  {
+    struct block_frame *p;
+
+    for (p = blkfp; p; p = p->prev) {
+      if ((q = dict_at(d = p->dict, s)) != 0) {
+	return (q);
+      }
+    }
+  }
+
+  {
+    struct module_frame *p;
+    
+    for (p = modfp; p; p = p->prev) {
+      if ((q = dict_at(d = OBJ(MODULE(p->module)->base), s)) != 0) {
+	return (q);
+      }
+    }
+  }
+
+  return (0);
+}
+
+obj_t
+env_top(void)
+{
+  return (blkfp ? blkfp->dict : OBJ(MODULE(modfp->module)->base));
+}
+
+void
+cm_env_at(void)
+{
+  obj_t p;
+
+  if ((p = env_find(MC_ARG(1))) == 0) {
+    fprintf(stderr, "Variable not bound: %s\n", STR(MC_ARG(1))->data);
+    
+    error();
+  }
+
+  obj_assign(MC_RESULT, CDR(p));
+}
+
+void
+cm_env_defput(void)
+{
+  dict_at_put(env_top(), MC_ARG(1), MC_ARG(2));
+
+  obj_assign(MC_RESULT, MC_ARG(2));
+}
+
+void
+cm_env_atput(void)
+{
+  obj_t p;
+
+  if ((p = env_find(MC_ARG(1))) == 0) {
+    cm_env_defput();
+
+    return;
+  }
+
+  obj_assign(&CDR(p), MC_ARG(2));
+
+  obj_assign(MC_RESULT, MC_ARG(2));
+}
+
+/***************************************************************************/
+
 void
 cm_system_dump(void)
 {
@@ -1492,16 +1588,20 @@ struct {
   { &consts.str_addc,        "add:" },
   { &consts.str_array,       "#Array" },
   { &consts.str_atc,         "at:" },
+  { &consts.str_atc_putc,    "at:put:" },
   { &consts.str_block,       "#Block" },
   { &consts.str_boolean,     "#Boolean" },
   { &consts.str_code_method, "#Code_Method" },
   { &consts.str_copy,        "copy" },
+  { &consts.str_defc_putc,   "def:put:" },
   { &consts.str_dict,        "#Dictionary" },
   { &consts.str_dptr,        "#Dptr" },
   { &consts.str_dump,        "dump" },
+  { &consts.str_env,         "#Environment" },
   { &consts.str_equalc,      "equal:" },
   { &consts.str_eval,        "eval" },
   { &consts.str_evalc,       "eval:" },
+  { &consts.str_float,       "#Float" },
   { &consts.str_hash,        "hash" },
   { &consts.str_inst_of,     "instance-of" },
   { &consts.str_integer,     "#Integer" },
@@ -1538,6 +1638,7 @@ struct {
   { &consts.cl_object,      &consts.str_object,      0,                                   0,                               0,      object_init,                0, object_free },
   { &consts.cl_bool,        &consts.str_boolean,     &consts.cl_object,                   0,        sizeof(struct inst_bool),        bool_init },
   { &consts.cl_int,         &consts.str_integer,     &consts.cl_object,                   0,         sizeof(struct inst_int),         int_init },
+  { &consts.cl_float,       &consts.str_float,       &consts.cl_object,                   0,       sizeof(struct inst_float),       float_init },
   { &consts.cl_str,         &consts.str_string,      &consts.cl_object,                   0,         sizeof(struct inst_str),         str_init,                0,    str_free },
   { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object, CLASS_FLAG_ABSTRACT,        sizeof(struct inst_dptr),        dptr_init,        dptr_walk },
   { &consts.cl_pair,        &consts.str_pair,        &consts.cl_dptr,                     0,        sizeof(struct inst_dptr), inst_init_parent },
@@ -1549,6 +1650,7 @@ struct {
   { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object,                   0, sizeof(struct inst_method_call), method_call_init, method_call_walk },
   { &consts.cl_block,       &consts.str_block,       &consts.cl_object,                   0,       sizeof(struct inst_block),       block_init,       block_walk },
   { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,                     0,      sizeof(struct inst_module),      module_init,      module_walk },
+  { &consts.cl_env,         &consts.str_env,         &consts.cl_object, CLASS_FLAG_ABSTRACT },
   { &consts.cl_system,      &consts.str_system,      &consts.cl_object, CLASS_FLAG_ABSTRACT }
 };
 
@@ -1572,13 +1674,14 @@ struct {
   { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_new,  cm_bool_new },
   { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_newc, cm_bool_new },
 
+  { &consts.cl_bool, offsetof(struct class, inst_methods), &consts.str_tostring, cm_bool_tostring },
+
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_addc,     cm_int_add },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_ltc,      cm_int_lt },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_tostring, cm_int_tostring },
 
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_eval,     cm_str_eval },
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_tostring, cm_str_tostring },
-  { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_setc,     cm_str_set },
 
   { &consts.cl_pair, offsetof(struct class, inst_methods), &consts.str_tostring, cm_pair_tostring },
 
@@ -1590,6 +1693,10 @@ struct {
   { &consts.cl_module, offsetof(struct class, inst_methods), &consts.str_tostring, cm_module_tostring },
 
   { &consts.cl_block, offsetof(struct class, inst_methods), &consts.str_evalc, cm_blk_eval },
+
+  { &consts.cl_env, offsetof(struct class, cl_methods), &consts.str_atc,       cm_env_at },  
+  { &consts.cl_env, offsetof(struct class, cl_methods), &consts.str_defc_putc, cm_env_defput },  
+  { &consts.cl_env, offsetof(struct class, cl_methods), &consts.str_atc_putc,  cm_env_atput },  
 
   { &consts.cl_system, offsetof(struct class, cl_methods), &consts.str_dump, cm_system_dump },  
 };
