@@ -822,6 +822,20 @@ pair_new(obj_t *result, obj_t car, obj_t cdr)
 }
 
 void
+cm_pair_eval(void)
+{
+  WORK_FRAME_DECL(work, 2);
+
+  work_frame_push(work);
+
+  inst_method_call(&WORK(work, 0), consts.str_eval, 1, &CAR(MC_ARG(0)));
+  inst_method_call(&WORK(work, 1), consts.str_eval, 1, &CDR(MC_ARG(0)));
+  pair_new(MC_RESULT, WORK(work, 0), WORK(work, 1));
+
+  work_frame_pop();
+}
+
+void
 cm_pair_tostring(void)
 {
   obj_t *a;
@@ -866,6 +880,26 @@ list_len(obj_t li)
   for (result = 0; li != 0; li = CDR(li), ++result);
 
   return (result);
+}
+
+void
+cm_list_eval(void)
+{
+  obj_t *p, q;
+
+  WORK_FRAME_DECL(work, 2);
+
+  work_frame_push(work);
+
+  for (p = &WORK(work, 0), q = MC_ARG(0); q; q = CDR(q)) {
+    inst_method_call(&WORK(work, 1), consts.str_eval, 1, &CAR(q));
+    list_new(p, WORK(work, 1), 0);
+    p = &CDR(*p);
+  }
+
+  obj_assign(MC_RESULT, WORK(work, 0));
+
+  work_frame_pop();
 }
 
 void
@@ -1682,8 +1716,10 @@ struct {
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_eval,     cm_str_eval },
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_tostring, cm_str_tostring },
 
+  { &consts.cl_pair, offsetof(struct class, inst_methods), &consts.str_eval,     cm_pair_eval },
   { &consts.cl_pair, offsetof(struct class, inst_methods), &consts.str_tostring, cm_pair_tostring },
 
+  { &consts.cl_list, offsetof(struct class, inst_methods), &consts.str_eval,     cm_list_eval },
   { &consts.cl_list, offsetof(struct class, inst_methods), &consts.str_tostring, cm_list_tostring },
 
   { &consts.cl_method_call, offsetof(struct class, inst_methods), &consts.str_tostring, cm_mc_tostring },
