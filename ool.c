@@ -317,7 +317,7 @@ cm_obj_tostring(void)
 
     sprintf(buf, "<%s@%p>", s, MC_ARG(0));
 
-    str_newc(MC_RESULT, 1, n, buf);
+    str_newc(MC_RESULT, 1, strlen(buf) + 1, buf);
 
     return;
   }
@@ -1367,7 +1367,7 @@ module_new(obj_t *dst, obj_t name, obj_t parent)
 }
 
 void
-cm_module_tostring(void)
+cm_module_name(void)
 {
   obj_assign(MC_RESULT, MODULE(MC_ARG(0))->name);
 }
@@ -1479,15 +1479,15 @@ inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv)
 /***************************************************************************/
 
 void
-cm_metaclass_tostring(void)
-{
-  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->name);
-}
-
-void
 cm_metaclass_new(void)
 {
   inst_alloc(MC_RESULT, MC_ARG(0));
+}
+
+void
+cm_metaclass_name(void)
+{
+  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->name);
 }
 
 /***************************************************************************/
@@ -1644,6 +1644,7 @@ struct {
   { &consts.str_metaclass,   "#Metaclass" },
   { &consts.str_method_call, "#Method_Call" },
   { &consts.str_module,      "#Module" },
+  { &consts.str_name,        "name" },
   { &consts.str_new,         "new" },
   { &consts.str_newc,        "new:" },
   { &consts.str_newc_instance_variablesc, "new:instance-variables:" },
@@ -1696,7 +1697,7 @@ struct {
   { &consts.metaclass, offsetof(struct class, cl_methods), &consts.str_newc_instance_variablesc,  cm_metaclass_new },
 
   { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_new,      cm_metaclass_new },
-  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_tostring, cm_metaclass_tostring },
+  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_name,     cm_metaclass_name },
 
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_inst_of,  cm_obj_inst_of },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_quote,    cm_obj_quote },
@@ -1725,9 +1726,9 @@ struct {
   { &consts.cl_method_call, offsetof(struct class, inst_methods), &consts.str_tostring, cm_mc_tostring },
   { &consts.cl_method_call, offsetof(struct class, inst_methods), &consts.str_eval,     cm_mc_eval },
 
-  { &consts.cl_module, offsetof(struct class, inst_methods), &consts.str_tostring, cm_module_tostring },
-
   { &consts.cl_block, offsetof(struct class, inst_methods), &consts.str_evalc, cm_blk_eval },
+
+  { &consts.cl_module, offsetof(struct class, inst_methods), &consts.str_name, cm_module_name },
 
   { &consts.cl_env, offsetof(struct class, cl_methods), &consts.str_atc,       cm_env_at },  
   { &consts.cl_env, offsetof(struct class, cl_methods), &consts.str_defc_putc, cm_env_defput },  

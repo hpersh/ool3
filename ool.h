@@ -221,6 +221,7 @@ struct {
   obj_t str_metaclass;
   obj_t str_method_call;
   obj_t str_module;
+  obj_t str_name;
   obj_t str_new;
   obj_t str_newc;
   obj_t str_newc_instance_variablesc;
