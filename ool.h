@@ -193,6 +193,7 @@ void  array_new(obj_t *dst, unsigned size);
 void  method_call_new(obj_t *dst, obj_t sel, obj_t args);
 void  block_new(obj_t *dst, obj_t args, obj_t body);
 void  module_new(obj_t *dst, obj_t name, obj_t parent);
+void  env_defput(obj_t nm, obj_t val);
 
 struct {
   obj_t str_addc;
@@ -223,7 +224,7 @@ struct {
   obj_t str_name;
   obj_t str_new;
   obj_t str_newc;
-  obj_t str_newc_instance_variablesc;
+  obj_t str_newc_parentc_instance_variablesc;
   obj_t str_object;
   obj_t str_pair;
   obj_t str_quote;

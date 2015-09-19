@@ -494,7 +494,9 @@ cm_int_new(void)
 
   intval_t val = 0;
   
-  if (cl == consts.cl_float) {
+  if (cl == consts.cl_bool) {
+    val = (BOOL(MC_ARG(1))->val != 0);
+  } else if (cl == consts.cl_float) {
     val = (intval_t) FLOAT(MC_ARG(1))->val;
   } else  method_bad_arg_err(MC_ARG(1));
 
@@ -1470,9 +1472,91 @@ inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv)
 /***************************************************************************/
 
 void
+user_walk(obj_t obj, void (*func)(obj_t))
+{
+  obj_t    cl = inst_of(obj), *p;
+  unsigned ofs;
+
+  for (ofs = CLASS(CLASS(cl)->parent)->inst_size, p = (obj_t *)((char *) obj + ofs);
+       ofs < CLASS(cl)->inst_size;
+       ofs += sizeof(obj_t), ++p
+       ) {
+    (*func)(*p);
+  }
+}
+
+void
+metaclass_init(obj_t inst, obj_t cl, unsigned argc, va_list ap)
+{
+  assert(argc >= 3);
+
+  obj_t name      = va_arg(ap, obj_t);
+  obj_t parent    = va_arg(ap, obj_t);
+  obj_t inst_vars = va_arg(ap, obj_t);
+
+  WORK_FRAME_DECL(work, 1);
+
+  work_frame_push(work);
+
+  obj_assign(&CLASS(inst)->name,   name);
+  obj_assign(&CLASS(inst)->module, modfp->module);
+  obj_assign(&CLASS(inst)->parent, parent);
+
+  unsigned n = list_len(inst_vars);
+
+  CLASS(inst)->inst_size = CLASS(parent)->inst_size + n * sizeof(obj_t);
+  if (n == 0) {
+    CLASS(inst)->inst_cache = CLASS(parent)->inst_cache;
+  } else {
+    list_init(CLASS(inst)->_inst_cache);
+    CLASS(inst)->inst_cache = CLASS(inst)->_inst_cache;
+  }
+  
+  CLASS(inst)->walk = user_walk;
+
+  strdict_new(&CLASS(inst)->cl_vars, 16);
+  strdict_new(&CLASS(inst)->cl_methods, 16);
+  strdict_new(&CLASS(inst)->inst_vars, 16);
+  strdict_new(&CLASS(inst)->inst_methods, 16);
+
+  unsigned ofs;
+  obj_t    p;
+
+  for (ofs = CLASS(parent)->inst_size, p = inst_vars; p != 0; p = CDR(p), ofs += sizeof(obj_t)) {
+    int_new(&WORK(work, 0), ofs);
+    dict_at_put(CLASS(inst)->inst_vars, CAR(p), WORK(work, 0));
+  }
+
+  work_frame_pop();
+}
+
+void
+metaclass_walk(obj_t inst, void (*func)(obj_t))
+{
+  (*func)(CLASS(inst)->name);
+  (*func)(CLASS(inst)->module);
+  (*func)(CLASS(inst)->parent);
+  (*func)(CLASS(inst)->cl_vars);
+  (*func)(CLASS(inst)->cl_methods);
+  (*func)(CLASS(inst)->inst_vars);
+  (*func)(CLASS(inst)->inst_methods);
+}
+
+void
 cm_metaclass_new(void)
 {
-  inst_alloc(MC_RESULT, MC_ARG(0));
+  WORK_FRAME_DECL(work, 1);
+
+  work_frame_push(work);
+
+  inst_alloc(&WORK(work, 0), consts.metaclass);
+  inst_init(WORK(work, 0), 3, MC_ARG(1), MC_ARG(2), MC_ARG(3));
+
+  env_defput(MC_ARG(1), WORK(work, 0));
+
+  obj_assign(MC_RESULT, WORK(work, 0));
+
+  work_frame_pop();
 }
 
 void
@@ -1532,9 +1616,15 @@ cm_env_at(void)
 }
 
 void
+env_defput(obj_t nm, obj_t val)
+{
+  dict_at_put(env_top(), nm, val);
+}
+
+void
 cm_env_defput(void)
 {
-  dict_at_put(env_top(), MC_ARG(1), MC_ARG(2));
+  env_defput(MC_ARG(1), MC_ARG(2));
 
   obj_assign(MC_RESULT, MC_ARG(2));
 }
@@ -1637,7 +1727,7 @@ struct {
   { &consts.str_name,        "name" },
   { &consts.str_new,         "new" },
   { &consts.str_newc,        "new:" },
-  { &consts.str_newc_instance_variablesc, "new:instance-variables:" },
+  { &consts.str_newc_parentc_instance_variablesc, "new:parent:instance-variables:" },
   { &consts.str_object,      "#Object" },
   { &consts.str_pair,        "#Pair" },
   { &consts.str_quote,       "&quote" },
@@ -1659,7 +1749,7 @@ struct {
   void     (*walk)(obj_t obj, void (*func)(obj_t obj));
   void     (*free)(obj_t obj);
 } init_cl_tbl[] = {
-  { &consts.cl_object,      &consts.str_object,      0,                                   0,                               0,      object_init,                0, object_free },
+  { &consts.cl_object,      &consts.str_object,      0,                                   0,              sizeof(struct obj),      object_init,                0, object_free },
   { &consts.cl_bool,        &consts.str_boolean,     &consts.cl_object,                   0,        sizeof(struct inst_bool),        bool_init },
   { &consts.cl_int,         &consts.str_integer,     &consts.cl_object,                   0,         sizeof(struct inst_int),         int_init },
   { &consts.cl_float,       &consts.str_float,       &consts.cl_object,                   0,       sizeof(struct inst_float),       float_init },
@@ -1684,7 +1774,7 @@ struct {
   obj_t    *sel;
   void     (*func)(void);
 } init_method_tbl[] = {
-  { &consts.metaclass, offsetof(struct class, cl_methods), &consts.str_newc_instance_variablesc,  cm_metaclass_new },
+  { &consts.metaclass, offsetof(struct class, cl_methods), &consts.str_newc_parentc_instance_variablesc,  cm_metaclass_new },
 
   { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_new,      cm_metaclass_new },
   { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_name,     cm_metaclass_name },
@@ -1781,6 +1871,11 @@ init(void)
 
   obj_assign(&consts.metaclass, (obj_t) ool_mem_allocz(sizeof(struct class)));
   init_cl(consts.metaclass, 32);
+  CLASS(consts.metaclass)->inst_size = sizeof(struct class);
+  list_init(CLASS(consts.metaclass)->_inst_cache);
+  CLASS(consts.metaclass)->inst_cache = CLASS(consts.metaclass)->_inst_cache;
+  CLASS(consts.metaclass)->init = metaclass_init;
+  CLASS(consts.metaclass)->walk = metaclass_walk;
 
   /* Create classes, pass 1 - Allocate classes, some init */
 
@@ -1833,7 +1928,7 @@ init(void)
 
   obj_assign(&CLASS(consts.metaclass)->name, consts.str_metaclass);
   dict_at_put(consts.module_main, consts.str_metaclass, consts.metaclass);
-
+  
   for (i = 0; i < ARRAY_SIZE(init_cl_tbl); ++i) {
     obj_t cl = *init_cl_tbl[i].var, nm = *init_cl_tbl[i].name;
 
