@@ -129,9 +129,9 @@ method_argc_err(void)
 void
 method_bad_arg_err(obj_t arg)
 {
-  WORK_FRAME_DECL(work, 1);
-
   if (++err_depth > 1)  double_err();
+
+  WORK_FRAME_DECL(work, 1);
 
   work_frame_push(work);
 
@@ -164,7 +164,11 @@ ool_mem_alloc(unsigned size)
   ++stats->mem_alloc_cnt;
   stats->mem_alloc_bytes += size;
 
-  return (malloc(size));
+  void *result = malloc(size);
+
+  assert(result != 0);
+  
+  return (result);
 }
 
 void *
@@ -209,17 +213,14 @@ obj_free(obj_t obj)
 void
 inst_alloc(obj_t *dst, obj_t cl)
 {
-  obj_t    p;
-  unsigned size;
-  struct list *inst_cache;
-
-  if (CLASS(cl)->flags & CLASS_FLAG_ABSTRACT) {
+  if (CLASS(cl)->flags & CLASS_FLAG_NO_INST) {
     fprintf(stderr, "Cannot instantiate class %s\n", STR(CLASS(cl)->name)->data);
     error();
   }
 
-  size       = CLASS(cl)->inst_size;
-  inst_cache = CLASS(cl)->inst_cache;
+  unsigned    size        = CLASS(cl)->inst_size;
+  struct list *inst_cache = CLASS(cl)->inst_cache;
+  obj_t       p;
 
   if (list_empty(inst_cache)) {
     p = (obj_t) ool_mem_allocz(size);
@@ -284,24 +285,24 @@ object_free(obj_t obj)
 void
 cm_obj_inst_of(void)
 {
-  obj_assign(MC_RESULT, inst_of(MC_ARG(0)));
-}
+  if (MC_ARGC != 1)  method_argc_err();
 
-void
-cm_obj_copy(void)
-{
-  obj_assign(MC_RESULT, MC_ARG(0));
+  obj_assign(MC_RESULT, inst_of(MC_ARG(0)));
 }
 
 void
 cm_obj_quote(void)
 {
+  if (MC_ARGC != 1)  method_argc_err();
+  
   obj_assign(MC_RESULT, MC_ARG(0));
 }
 
 void
 cm_obj_eval(void)
 {
+  if (MC_ARGC != 1)  method_argc_err();
+  
   obj_assign(MC_RESULT, MC_ARG(0));
 }
 
@@ -310,19 +311,19 @@ cm_obj_tostring(void)
 {
   if (MC_ARGC != 1)  method_argc_err();
 
-  if (MC_ARG(0) != 0) {
-    char     *s = STR(CLASS(inst_of(MC_ARG(0)))->name)->data;
-    unsigned n  = 1 + strlen(s) + 1 + 18 + 1 + 1;
-    char     buf[n];
-
-    sprintf(buf, "<%s@%p>", s, MC_ARG(0));
-
-    str_newc(MC_RESULT, 1, strlen(buf) + 1, buf);
+  if (MC_ARG(0) == 0) {
+    str_newc(MC_RESULT, 1, 5, "#nil");
 
     return;
-  }
-
-  str_newc(MC_RESULT, 1, 5, "#nil");
+  }  
+  
+  char     *s = STR(CLASS(inst_of(MC_ARG(0)))->name)->data;
+  unsigned n  = 1 + strlen(s) + 1 + 18 + 1 + 1;
+  char     buf[n];
+  
+  sprintf(buf, "<%s@%p>", s, MC_ARG(0));
+  
+  str_newc(MC_RESULT, 1, strlen(buf) + 1, buf);
 }
 
 void
@@ -330,22 +331,20 @@ cm_obj_while(void)
 {
   if (MC_ARGC != 2)  method_argc_err();
 
-  {
-    WORK_FRAME_DECL(work, 2);
-
-    work_frame_push(work);
-
-    for (;;) {
-      inst_method_call(&WORK(work, 0), consts.str_eval, 1, &MC_ARG(0));
-      if (inst_of(WORK(work, 0)) == consts.cl_bool && !BOOL(WORK(work, 0))->val)  break;
-
-      inst_method_call(&WORK(work, 1), consts.str_eval, 1, &MC_ARG(1));      
-    }
-
-    obj_assign(MC_RESULT, WORK(work, 1));
-
-    work_frame_pop();
+  WORK_FRAME_DECL(work, 2);
+  
+  work_frame_push(work);
+  
+  for (;;) {
+    inst_method_call(&WORK(work, 0), consts.str_eval, 1, &MC_ARG(0));
+    if (inst_of(WORK(work, 0)) == consts.cl_bool && !BOOL(WORK(work, 0))->val)  break;
+    
+    inst_method_call(&WORK(work, 1), consts.str_eval, 1, &MC_ARG(1));      
   }
+  
+  obj_assign(MC_RESULT, WORK(work, 1));
+  
+  work_frame_pop();
 }
 
 /***************************************************************************/
@@ -370,18 +369,18 @@ bool_new(obj_t *dst, unsigned val)
 void
 cm_bool_newc(void)
 {
-  obj_t    cl;
-  unsigned val = 0;
-
   if (MC_ARGC != 2)  method_argc_err();
   
-  cl = inst_of(MC_ARG(1));
+  obj_t cl = inst_of(MC_ARG(1));
   
   if (cl == consts.cl_bool) {
     obj_assign(MC_RESULT, MC_ARG(1));
     
     return;
   }
+
+  unsigned val = 0;
+  
   if (cl == consts.cl_int) {
     val = (INT(MC_ARG(1))->val != 0);
   } else if (cl == consts.cl_list) {
@@ -394,13 +393,21 @@ cm_bool_newc(void)
 void
 cm_bool_tostring(void)
 {
-  char *s;
-
   if (MC_ARGC != 1)  method_argc_err();
   if (inst_of(MC_ARG(0)) != consts.cl_bool)  method_bad_arg_err(MC_ARG(0));
 
-  s = BOOL(MC_ARG(0))->val ? "#true" : "#false";
-  str_newc(MC_RESULT, 1, strlen(s) + 1, s);
+  char     *s;
+  unsigned n;
+  
+  if (BOOL(MC_ARG(0))->val) {
+    s = "#true";
+    n = 6;
+  } else {
+    s = "#false";
+    n = 7;
+  }
+  
+  str_newc(MC_RESULT, 1, n, s);
 }
 
 void
@@ -475,25 +482,21 @@ int_new(obj_t *dst, intval_t val)
 void
 cm_int_new(void)
 {
-  intval_t val = 0;
+  if (MC_ARGC != 2)  method_argc_err();
 
-  if (MC_ARGC < 1 || MC_ARGC > 2)  method_argc_err();
+  obj_t cl  = inst_of(MC_ARG(1));
 
-  if (MC_ARGC == 2) {
-    obj_t cl;
-
-    if (MC_ARG(1) == 0)  method_bad_arg_err(MC_ARG(1));
-
-    cl = inst_of(MC_ARG(1));
-    if (cl == consts.cl_int) {
-      obj_assign(MC_RESULT, MC_ARG(1));
-
-      return;
-    }
-    if (cl == consts.cl_float) {
-      val = (intval_t) FLOAT(MC_ARG(1))->val;
-    } else  method_bad_arg_err(MC_ARG(1));
+  if (cl == consts.cl_int) {
+    obj_assign(MC_RESULT, MC_ARG(1));
+    
+    return;
   }
+
+  intval_t val = 0;
+  
+  if (cl == consts.cl_float) {
+    val = (intval_t) FLOAT(MC_ARG(1))->val;
+  } else  method_bad_arg_err(MC_ARG(1));
 
   int_new(MC_RESULT, val);
 }
@@ -979,30 +982,6 @@ array_free(obj_t obj)
   ool_mem_free(ARRAY(obj)->data, ARRAY(obj)->size * sizeof(ARRAY(obj)->data[0]));
 }
 
-void
-array_copy(obj_t *dst, obj_t src)
-{
-  obj_t    *p, *q;
-  unsigned n;
-
-  WORK_FRAME_DECL(work, 1);
-
-  work_frame_push(work);
-
-  array_new(&WORK(work, 0), ARRAY(src)->size);
-  
-  for (q = ARRAY(WORK(work, 0))->data, p = ARRAY(src)->data, n = ARRAY(src)->size;
-       n;
-       --n, ++p, ++q
-       ) {
-    inst_method_call(q, consts.str_copy, 1, p);
-  }
-
-  obj_assign(dst, WORK(work, 0));
-
-  work_frame_pop();
-}
-
 /***************************************************************************/
 
 void
@@ -1409,9 +1388,15 @@ method_find(obj_t cl, unsigned dofs, obj_t sel, obj_t *found_cl)
 void
 _method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *argv)
 {
-  if (inst_of(m) == consts.cl_code_method) {
+  obj_t mcl = inst_of(m);
+
+  if (mcl == consts.cl_code_method) {
     (*CODE_METHOD(m)->func)();
-  } else if (inst_of(m) == consts.cl_block) {
+
+    return;
+  }
+
+  if (mcl == consts.cl_block) {
     obj_t *p;
 
     WORK_FRAME_DECL(work, 2);
@@ -1428,11 +1413,13 @@ _method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *a
     inst_method_call(result, consts.str_evalc, 2, &WORK(work, 0));
 
     work_frame_pop();
-  } else {
-    fprintf(stderr, "Invalid method definition\n");
 
-    error();
+    return;
   }
+
+  fprintf(stderr, "Invalid method definition\n");
+  
+  error();
 }
 
 void
@@ -1446,21 +1433,25 @@ method_run(obj_t m, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *ar
     _method_run(m, result, cl, sel, argc, argv);
 
     module_frame_pop();
-  } else {
-    _method_run(m, result, cl, sel, argc, argv);
+
+    return;
   }
+
+  _method_run(m, result, cl, sel, argc, argv);
 }
 
 void
 inst_method_call(obj_t *result, obj_t sel, unsigned argc, obj_t *argv)
 {
   obj_t cl;
-  obj_t m;
+  obj_t m = 0;
   struct method_call_frame mcfr[1];
 
-  m = method_find(inst_of(argv[0]), offsetof(struct class, inst_methods), sel, &cl);
-  if (m == 0 && inst_of(argv[0]) == consts.metaclass) {
+  if (inst_of(argv[0]) == consts.metaclass) {
     m = method_find(argv[0], offsetof(struct class, cl_methods), sel, &cl);
+  }
+  if (m == 0) {
+    m = method_find(inst_of(argv[0]), offsetof(struct class, inst_methods), sel, &cl);
   }
 
   method_call_frame_push(mcfr, result, cl, sel, argc, argv);
@@ -1625,7 +1616,6 @@ struct {
   { &consts.str_block,       "#Block" },
   { &consts.str_boolean,     "#Boolean" },
   { &consts.str_code_method, "#Code_Method" },
-  { &consts.str_copy,        "copy" },
   { &consts.str_defc_putc,   "def:put:" },
   { &consts.str_dict,        "#Dictionary" },
   { &consts.str_dptr,        "#Dptr" },
@@ -1674,7 +1664,7 @@ struct {
   { &consts.cl_int,         &consts.str_integer,     &consts.cl_object,                   0,         sizeof(struct inst_int),         int_init },
   { &consts.cl_float,       &consts.str_float,       &consts.cl_object,                   0,       sizeof(struct inst_float),       float_init },
   { &consts.cl_str,         &consts.str_string,      &consts.cl_object,                   0,         sizeof(struct inst_str),         str_init,                0,    str_free },
-  { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object, CLASS_FLAG_ABSTRACT,        sizeof(struct inst_dptr),        dptr_init,        dptr_walk },
+  { &consts.cl_dptr,        &consts.str_dptr,        &consts.cl_object,  CLASS_FLAG_NO_INST,        sizeof(struct inst_dptr),        dptr_init,        dptr_walk },
   { &consts.cl_pair,        &consts.str_pair,        &consts.cl_dptr,                     0,        sizeof(struct inst_dptr), inst_init_parent },
   { &consts.cl_list,        &consts.str_list,        &consts.cl_dptr,                     0,        sizeof(struct inst_dptr), inst_init_parent },
   { &consts.cl_array,       &consts.str_array,       &consts.cl_object,                   0,       sizeof(struct inst_array),       array_init,       array_walk,  array_free },
@@ -1684,8 +1674,8 @@ struct {
   { &consts.cl_method_call, &consts.str_method_call, &consts.cl_object,                   0, sizeof(struct inst_method_call), method_call_init, method_call_walk },
   { &consts.cl_block,       &consts.str_block,       &consts.cl_object,                   0,       sizeof(struct inst_block),       block_init,       block_walk },
   { &consts.cl_module,      &consts.str_module,      &consts.cl_dict,                     0,      sizeof(struct inst_module),      module_init,      module_walk },
-  { &consts.cl_env,         &consts.str_env,         &consts.cl_object, CLASS_FLAG_ABSTRACT },
-  { &consts.cl_system,      &consts.str_system,      &consts.cl_object, CLASS_FLAG_ABSTRACT }
+  { &consts.cl_env,         &consts.str_env,         &consts.cl_object,  CLASS_FLAG_NO_INST },
+  { &consts.cl_system,      &consts.str_system,      &consts.cl_object,  CLASS_FLAG_NO_INST }
 };
 
 struct {
@@ -1702,13 +1692,14 @@ struct {
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_inst_of,  cm_obj_inst_of },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_quote,    cm_obj_quote },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_eval,     cm_obj_eval },
-  { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_copy,     cm_obj_copy },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_tostring, cm_obj_tostring },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_whilec,   cm_obj_while },
 
   { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_newc, cm_bool_newc },
 
   { &consts.cl_bool, offsetof(struct class, inst_methods), &consts.str_tostring, cm_bool_tostring },
+
+  { &consts.cl_int, offsetof(struct class, cl_methods), &consts.str_newc,     cm_int_new },
 
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_addc,     cm_int_add },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_ltc,      cm_int_lt },

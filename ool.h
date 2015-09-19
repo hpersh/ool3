@@ -166,7 +166,7 @@ struct class {
   obj_t       module;
   obj_t       parent;
   enum {
-    CLASS_FLAG_ABSTRACT = 1 << 0
+    CLASS_FLAG_NO_INST = 1 << 0
   }           flags;
   unsigned    inst_size;
   struct list _inst_cache[1], *inst_cache;
@@ -202,7 +202,6 @@ struct {
   obj_t str_block;
   obj_t str_boolean;
   obj_t str_code_method;
-  obj_t str_copy;
   obj_t str_defc_putc;
   obj_t str_dict;
   obj_t str_dptr;
@@ -300,20 +299,22 @@ struct work_frame {
   struct frame      base[1];
   struct work_frame *prev;
   unsigned          size;
-  obj_t             *work;
+  obj_t             *data;
 };
 
 struct work_frame *wfp;
 
+#define WORK_FRAME_DATA(nm)  __ ## nm ## _data
+
 #define WORK_FRAME_DECL(nm , n) \
-  obj_t __work_ ## nm [n];	\
-  struct work_frame nm[1] = { { .size = (n), .work = __work_ ## nm } };
+  obj_t WORK_FRAME_DATA(nm) [n];					\
+  struct work_frame nm[1] = { { .size = (n), .data = WORK_FRAME_DATA(nm) } }
 
 static inline void
 work_frame_push(struct work_frame *wfr)
 {
   wfr->prev = wfp;
-  memset(wfr->work, 0, wfr->size * sizeof(obj_t));
+  memset(wfr->data, 0, wfr->size * sizeof(obj_t));
 
   wfp = wfr;
 
@@ -328,12 +329,12 @@ work_frame_pop(void)
 
   frame_pop();
 
-  for (p = wfp->work, n = wfp->size; n; --n, ++p)  obj_release(*p);
+  for (p = wfp->data, n = wfp->size; n; --n, ++p)  obj_release(*p);
 
   wfp = wfp->prev;
 }
 
-#define WORK(nm, i)  ((nm)->work[i])
+#define WORK(nm, i)  ((nm)->data[i])
 
 struct method_call_frame {
   struct frame             base[1];
