@@ -347,6 +347,40 @@ cm_obj_while(void)
   work_frame_pop();
 }
 
+void
+cm_obj_new(void)
+{
+  inst_alloc(MC_RESULT, MC_ARG(0));
+}
+
+obj_t *
+inst_var_find(obj_t inst, obj_t inst_var)
+{
+  obj_t p = dict_at(CLASS(inst_of(inst))->inst_vars, inst_var);
+
+  if (p == 0) {
+    fprintf(stderr, "No such instance variable\n");
+
+    error();
+  }
+
+  return ((obj_t *)((char *) inst + INT(CDR(p))->val));
+}
+
+void
+cm_obj_at(void)
+{
+  obj_assign(MC_RESULT, *inst_var_find(MC_ARG(0), MC_ARG(1)));
+}
+
+void
+cm_obj_atput(void)
+{
+  obj_assign(inst_var_find(MC_ARG(0), MC_ARG(1)), MC_ARG(2));
+
+  obj_assign(MC_RESULT, MC_ARG(2));
+}
+
 /***************************************************************************/
 
 void
@@ -1100,6 +1134,20 @@ dict_del(obj_t dict, obj_t key)
   obj_assign(p, CDR(*p));
 }
 
+void
+cm_dict_at(void)
+{
+  obj_assign(MC_RESULT, dict_at(MC_ARG(0), MC_ARG(1)));
+}
+
+void
+cm_dict_atput(void)
+{
+  dict_at_put(MC_ARG(0), MC_ARG(1), MC_ARG(2));
+
+  obj_assign(MC_RESULT, MC_ARG(2));
+}
+
 /***************************************************************************/
 
 void
@@ -1565,6 +1613,36 @@ cm_metaclass_name(void)
   obj_assign(MC_RESULT, CLASS(MC_ARG(0))->name);
 }
 
+void
+cm_metaclass_module(void)
+{
+  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->module);
+}
+
+void
+cm_metaclass_parent(void)
+{
+  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->parent);
+}
+
+void
+cm_metaclass_cl_vars(void)
+{
+  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->cl_vars);
+}
+
+void
+cm_metaclass_cl_methods(void)
+{
+  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->cl_methods);
+}
+
+void
+cm_metaclass_inst_methods(void)
+{
+  obj_assign(MC_RESULT, CLASS(MC_ARG(0))->inst_methods);
+}
+
 /***************************************************************************/
 
 obj_t
@@ -1717,6 +1795,7 @@ struct {
   { &consts.str_float,       "#Float" },
   { &consts.str_hash,        "hash" },
   { &consts.str_inst_of,     "instance-of" },
+  { &consts.str_inst_methods,   "instance-methods" },
   { &consts.str_integer,     "#Integer" },
   { &consts.str_list,        "#List" },
   { &consts.str_ltc,         "lt:" },
@@ -1730,6 +1809,7 @@ struct {
   { &consts.str_newc_parentc_instance_variablesc, "new:parent:instance-variables:" },
   { &consts.str_object,      "#Object" },
   { &consts.str_pair,        "#Pair" },
+  { &consts.str_parent,      "parent" },
   { &consts.str_quote,       "&quote" },
   { &consts.str_set,         "#Set" },
   { &consts.str_setc,        "&set:" },
@@ -1776,14 +1856,18 @@ struct {
 } init_method_tbl[] = {
   { &consts.metaclass, offsetof(struct class, cl_methods), &consts.str_newc_parentc_instance_variablesc,  cm_metaclass_new },
 
-  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_new,      cm_metaclass_new },
+  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_new,      cm_obj_new },
   { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_name,     cm_metaclass_name },
+  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_parent,   cm_metaclass_parent },
+  { &consts.metaclass, offsetof(struct class, inst_methods), &consts.str_inst_methods, cm_metaclass_inst_methods },
 
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_inst_of,  cm_obj_inst_of },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_quote,    cm_obj_quote },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_eval,     cm_obj_eval },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_tostring, cm_obj_tostring },
   { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_whilec,   cm_obj_while },
+  { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_atc,      cm_obj_at },
+  { &consts.cl_object, offsetof(struct class, inst_methods), &consts.str_atc_putc, cm_obj_atput },
 
   { &consts.cl_bool, offsetof(struct class, cl_methods), &consts.str_newc, cm_bool_newc },
 
@@ -1803,6 +1887,9 @@ struct {
 
   { &consts.cl_list, offsetof(struct class, inst_methods), &consts.str_eval,     cm_list_eval },
   { &consts.cl_list, offsetof(struct class, inst_methods), &consts.str_tostring, cm_list_tostring },
+
+  { &consts.cl_dict, offsetof(struct class, inst_methods), &consts.str_atc,      cm_dict_at },
+  { &consts.cl_dict, offsetof(struct class, inst_methods), &consts.str_atc_putc, cm_dict_atput },
 
   { &consts.cl_method_call, offsetof(struct class, inst_methods), &consts.str_tostring, cm_mc_tostring },
   { &consts.cl_method_call, offsetof(struct class, inst_methods), &consts.str_eval,     cm_mc_eval },
@@ -1871,6 +1958,7 @@ init(void)
 
   obj_assign(&consts.metaclass, (obj_t) ool_mem_allocz(sizeof(struct class)));
   init_cl(consts.metaclass, 32);
+  obj_assign(&CLASS(consts.metaclass)->module, consts.module_main);
   CLASS(consts.metaclass)->inst_size = sizeof(struct class);
   list_init(CLASS(consts.metaclass)->_inst_cache);
   CLASS(consts.metaclass)->inst_cache = CLASS(consts.metaclass)->_inst_cache;

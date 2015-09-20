@@ -202,6 +202,8 @@ struct {
   obj_t str_atc_putc;
   obj_t str_block;
   obj_t str_boolean;
+  obj_t str_cl_methods;
+  obj_t str_cl_vars;
   obj_t str_code_method;
   obj_t str_defc_putc;
   obj_t str_dict;
@@ -213,6 +215,7 @@ struct {
   obj_t str_evalc;
   obj_t str_float;
   obj_t str_hash;
+  obj_t str_inst_methods;
   obj_t str_inst_of;
   obj_t str_integer;
   obj_t str_list;
@@ -227,6 +230,7 @@ struct {
   obj_t str_newc_parentc_instance_variablesc;
   obj_t str_object;
   obj_t str_pair;
+  obj_t str_parent;
   obj_t str_quote;
   obj_t str_set;
   obj_t str_setc;
