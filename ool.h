@@ -119,12 +119,13 @@ struct inst_array {
 
 struct inst_set {
   struct inst_array base[1];
+  obj_t             *(*find)(obj_t dict, obj_t key, obj_t **bucket);
   unsigned          cnt;
 };
+#define SET(x)  ((struct inst_set *)(x))
 
 struct inst_dict {
   struct inst_set base[1];
-  obj_t           *(*find)(obj_t dict, obj_t key, obj_t **bucket);
 };
 #define DICT(x)  ((struct inst_dict *)(x))
 

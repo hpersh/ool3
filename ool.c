@@ -753,10 +753,10 @@ str_free(obj_t obj)
 unsigned
 str_hash(obj_t s)
 {
+  assert(inst_of(s) == consts.cl_str);
+
   unsigned result;
   char     *p, c;
-
-  assert(inst_of(s) == consts.cl_str);
 
   for (result = 0, p = STR(s)->data; (c = *p) != 0; ++p) {
     result += c;
@@ -790,12 +790,11 @@ strdict_find(obj_t dict, obj_t key, obj_t **bucket)
 unsigned
 round_up_to_power_of_2(unsigned n)
 {
-  unsigned nn;
-
   if (n <= 2)  return (n);
 
   for (--n;;) {
-    nn = n & (n - 1);
+    unsigned nn = n & (n - 1);
+
     if (nn == 0)  return (n << 1);
     n = nn;
   }
@@ -851,10 +850,10 @@ cm_str_tostring(void)
 void
 cm_str_eval(void)
 {
-  WORK_FRAME_DECL(work, 2);
-
   if (MC_ARGC != 1)                         method_argc_err();
   if (inst_of(MC_ARG(0)) != consts.cl_str)  method_bad_arg_err(MC_ARG(0));
+
+  WORK_FRAME_DECL(work, 2);
 
   work_frame_push(work);
 
@@ -963,6 +962,12 @@ list_len(obj_t li)
   for (result = 0; li != 0; li = CDR(li), ++result);
 
   return (result);
+}
+
+void
+cm_list_new(void)
+{
+  
 }
 
 void
@@ -1077,7 +1082,7 @@ dict_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 {
   assert(argc > 0);
 
-  DICT(self)->find = va_arg(ap, obj_t *(*)(obj_t, obj_t, obj_t **));  --argc;
+  DICT(self)->base->find = va_arg(ap, obj_t *(*)(obj_t, obj_t, obj_t **));  --argc;
   
   inst_init_parent(self, cl, argc, ap);
 }
@@ -1130,7 +1135,7 @@ dict_new(obj_t *dst, unsigned size)
 obj_t
 dict_at(obj_t dict, obj_t key)
 {
-  obj_t *p = (*DICT(dict)->find)(dict, key, 0);
+  obj_t *p = (*DICT(dict)->base->find)(dict, key, 0);
 
   return (p ? CAR(*p) : 0);
 }
@@ -1139,7 +1144,7 @@ void
 dict_at_put(obj_t dict, obj_t key, obj_t val)
 {
   obj_t *b;
-  obj_t *p = (*DICT(dict)->find)(dict, key, &b);
+  obj_t *p = (*DICT(dict)->base->find)(dict, key, &b);
 
   if (p == 0) {
     WORK_FRAME_DECL(work, 2);
@@ -1171,11 +1176,13 @@ void
 dict_del(obj_t dict, obj_t key)
 {
   obj_t *b;
-  obj_t *p = (*DICT(dict)->find)(dict, key, &b);
+  obj_t *p = (*DICT(dict)->base->find)(dict, key, &b);
 
   if (p == 0)  return;
 
   obj_assign(p, CDR(*p));
+
+  --DICT(dict)->base->cnt;
 }
 
 void
@@ -1959,7 +1966,7 @@ init_dict(obj_t d, unsigned size)
 {
   DICT(d)->base->base->size = size;
   DICT(d)->base->base->data = ool_mem_allocz(size * sizeof(obj_t));
-  DICT(d)->find             = strdict_find;
+  DICT(d)->base->find       = strdict_find;
 }
 
 void
