@@ -967,7 +967,42 @@ list_len(obj_t li)
 void
 cm_list_new(void)
 {
-  
+  if (MC_ARGC < 2) {
+    obj_assign(MC_RESULT, 0);
+
+    return;
+  }
+
+  obj_t cl = inst_of(MC_ARG(1));
+
+  if (cl == consts.cl_list) {
+    obj_assign(MC_RESULT, MC_ARG(1));
+
+    return;
+  }
+
+  if (cl == consts.cl_array) {
+    WORK_FRAME_DECL(work, 1);
+
+    work_frame_push(work);
+    
+    obj_t    *p, *q;
+    unsigned n;
+
+    for (p = &WORK(work, 0), q = ARRAY(MC_ARG(1))->data, n = ARRAY(MC_ARG(1))->size;
+	 n > 0;
+	 --n, ++q, p = &CDR(*p)
+	 ) {
+      list_new(p, *q, 0);
+    }
+
+    obj_assign(MC_RESULT, WORK(work, 0));
+
+    work_frame_pop();
+
+    return;
+  }
+
 }
 
 void
