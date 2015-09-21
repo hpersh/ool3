@@ -316,12 +316,12 @@ cm_obj_tostring(void)
 
     return;
   }  
-  
+
   char     *s = STR(CLASS(inst_of(MC_ARG(0)))->name)->data;
   unsigned n  = 1 + strlen(s) + 1 + 18 + 1 + 1;
   char     buf[n];
   
-  sprintf(buf, "<%s@%p>", s, MC_ARG(0));
+  snprintf(buf, n, "<%s@%p>", s, MC_ARG(0));
   
   str_newc(MC_RESULT, 1, strlen(buf) + 1, buf);
 }
@@ -415,11 +415,15 @@ cm_bool_newc(void)
 
   unsigned val = 0;
   
-  if (cl == consts.cl_int) {
-    val = (INT(MC_ARG(1))->val != 0);
-  } else if (cl == consts.cl_list) {
-    val = 1;
-  } else  method_bad_arg_err(MC_ARG(1));
+  if (MC_ARG(1) != 0) {
+    if (cl == consts.cl_int) {
+      val = (INT(MC_ARG(1))->val != 0);
+    } else if (cl == consts.cl_str) {
+      val = (strcmp(STR(MC_ARG(1))->data, "#true") == 0);
+    } else if (cl == consts.cl_list) {
+      val = 1;
+    } else  method_bad_arg_err(MC_ARG(1));
+  }
 	       
   bool_new(MC_RESULT, val);
 }
@@ -518,7 +522,7 @@ cm_int_new(void)
 {
   if (MC_ARGC != 2)  method_argc_err();
 
-  obj_t cl  = inst_of(MC_ARG(1));
+  obj_t cl = inst_of(MC_ARG(1));
 
   if (cl == consts.cl_int) {
     obj_assign(MC_RESULT, MC_ARG(1));
@@ -532,6 +536,8 @@ cm_int_new(void)
     val = (BOOL(MC_ARG(1))->val != 0);
   } else if (cl == consts.cl_float) {
     val = (intval_t) FLOAT(MC_ARG(1))->val;
+  } else if (cl == consts.cl_str) {
+    sscanf(STR(MC_ARG(1))->data, "%lld", &val);
   } else  method_bad_arg_err(MC_ARG(1));
 
   int_new(MC_RESULT, val);
@@ -572,10 +578,10 @@ cm_int_lt(void)
 void
 cm_int_tostring(void)
 {
-  char buf[32];
-
   if (MC_ARGC != 1)  method_argc_err();
   if (inst_of(MC_ARG(0)) != consts.cl_int)  method_bad_arg_err(MC_ARG(0));
+
+  char buf[32];
 
   snprintf(buf, sizeof(buf), "%lld", INT(MC_ARG(0))->val);
   
@@ -601,18 +607,54 @@ float_new(obj_t *dst, floatval_t val)
   inst_init(*dst, 1, val);
 }
 
+
+void
+cm_float_new(void)
+{
+  if (MC_ARGC != 2)  method_argc_err();
+
+  obj_t cl = inst_of(MC_ARG(1));
+
+  if (cl == consts.cl_float) {
+    obj_assign(MC_RESULT, MC_ARG(1));
+    
+    return;
+  }
+
+  floatval_t val = 0;
+  
+  if (cl == consts.cl_int) {
+    val = (floatval_t) INT(MC_ARG(1))->val;
+  } else if (cl == consts.cl_str) {
+    sscanf(STR(MC_ARG(1))->data, "%Lg", &val);
+  } else  method_bad_arg_err(MC_ARG(1));
+
+  float_new(MC_RESULT, val);
+}
+
+void
+cm_float_tostring(void)
+{
+  if (MC_ARGC != 1)  method_argc_err();
+  if (inst_of(MC_ARG(0)) != consts.cl_float)  method_bad_arg_err(MC_ARG(0));
+
+  char buf[64];
+
+  snprintf(buf, sizeof(buf), "%Lg", FLOAT(MC_ARG(0))->val);
+
+  str_newc(MC_RESULT, 1, strlen(buf) + 1, buf);
+}
+
 /***************************************************************************/
 
 void
 str_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 {
-  obj_t arg;
-
-  WORK_FRAME_DECL(work, 1);
-
   assert(argc > 0);
 
-  arg = va_arg(ap, obj_t);  --argc;
+  obj_t arg = va_arg(ap, obj_t);  --argc;
+
+  WORK_FRAME_DECL(work, 1);
 
   work_frame_push(work);
 
@@ -632,15 +674,16 @@ str_init(obj_t self, obj_t cl, unsigned argc, va_list ap)
 void
 str_newc(obj_t *result, unsigned argc, ...)
 {
-  va_list  ap;
-  unsigned k, n, len;
-  char     *s, *q;
-
   WORK_FRAME_DECL(work, 1);
 
   work_frame_push(work);
 
+  va_list  ap;
+
   va_start(ap, argc);
+
+  unsigned n, len;
+  char     *s, *q;
 
   for (len = 1, n = argc; n; --n) {
     len += va_arg(ap, unsigned) - 1;
@@ -672,13 +715,14 @@ str_newc(obj_t *result, unsigned argc, ...)
 void
 str_newv(obj_t *result, unsigned argc, obj_t *argv)
 {
-  unsigned k, n, len;
-  obj_t    *p;
-  char     *s, *q;
 
   WORK_FRAME_DECL(work, 1);
 
   work_frame_push(work);
+
+  unsigned n, len;
+  obj_t    *p;
+  char     *s, *q;
 
   for (len = 1, p = argv, n = argc; n; --n, ++p) {
     len += STR(*p)->size - 1;
@@ -1878,6 +1922,10 @@ struct {
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_addc,     cm_int_add },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_ltc,      cm_int_lt },
   { &consts.cl_int, offsetof(struct class, inst_methods), &consts.str_tostring, cm_int_tostring },
+
+  { &consts.cl_float, offsetof(struct class, cl_methods), &consts.str_newc,     cm_float_new },
+
+  { &consts.cl_float, offsetof(struct class, inst_methods), &consts.str_tostring,     cm_float_tostring },
 
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_eval,     cm_str_eval },
   { &consts.cl_str, offsetof(struct class, inst_methods), &consts.str_tostring, cm_str_tostring },
