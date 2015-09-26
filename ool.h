@@ -280,26 +280,20 @@ struct frame {
     FRAME_TYPE_MODULE,
     FRAME_TYPE_BLOCK,
     FRAME_TYPE_INPUT,
-    FRAME_TYPE_TRY
+    FRAME_TYPE_RESTART
   } type;
 };
 
 struct frame *fp;
 
-static inline void
-frame_push(struct frame *fr, unsigned type)
-{
-  fr->prev = fp;
-  fr->type = type;
+#define FRAME_PUSH(_fr, _type)			\
+  do {						\
+    (_fr)->type = (_type);			\
+    (_fr)->prev = fp;				\
+    fp = (_fr);					\
+  } while (0)
 
-  fp = fr;
-}
-
-static inline void
-frame_pop(void)
-{
-  fp = fp->prev;
-}
+#define FRAME_POP()  (fp = fp->prev)
 
 struct work_frame {
   struct frame      base[1];
@@ -312,35 +306,39 @@ struct work_frame *wfp;
 
 #define WORK_FRAME_DATA(nm)  __ ## nm ## _data
 
-#define WORK_FRAME_DECL(nm , n) \
-  obj_t WORK_FRAME_DATA(nm) [n];					\
+#define WORK_FRAME_DECL(nm , n)						\
+  obj_t WORK_FRAME_DATA(nm)[n];						\
   struct work_frame nm[1] = { { .size = (n), .data = WORK_FRAME_DATA(nm) } }
 
-static inline void
-work_frame_push(struct work_frame *wfr)
-{
-  wfr->prev = wfp;
-  memset(wfr->data, 0, wfr->size * sizeof(obj_t));
+#define WORK_FRAME_PUSH(_fr)						\
+  do {									\
+    memset((_fr)->data, 0, (_fr)->size * sizeof((_fr)->data[0]));	\
+    (_fr)->prev = wfp;							\
+    wfp = (_fr);							\
+    FRAME_PUSH((_fr)->base, FRAME_TYPE_WORK);				\
+  } while (0)
 
-  wfp = wfr;
+#define WORK_FRAME_POP()						\
+  do {									\
+    FRAME_POP();							\
+    obj_t    *__p;							\
+    unsigned __n;							\
+    for (__p = wfp->data, __n = wfp->size; __n > 0; --__nm, ++__p) {	\
+      obj_release(*__p);						\
+    }									\
+    wfp = wfp->prev;							\
+  } while (0)
 
-  frame_push(wfr->base, FRAME_TYPE_WORK);
-}
+#define WORK_FRAME_BEGIN(_n)			\
+  {						\
+    WORK_FRAME_DECL(__work, (_n));		\
+    WORK_FRAME_PUSH(__work);
 
-static inline void
-work_frame_pop(void)
-{
-  obj_t    *p;
-  unsigned n;
+#define WORK_FRAME_END \
+    WORK_FRAME_POP();    \
+  }
 
-  frame_pop();
-
-  for (p = wfp->data, n = wfp->size; n; --n, ++p)  obj_release(*p);
-
-  wfp = wfp->prev;
-}
-
-#define WORK(nm, i)  ((nm)->data[i])
+#define WORK(i)  (__work->data[i])
 
 struct method_call_frame {
   struct frame             base[1];
@@ -354,12 +352,36 @@ struct method_call_frame {
 
 struct method_call_frame *mcfp;
 
+#define METHOD_CALL_FRAME_PUSH(_fr, _rslt, _cl, _sel, _argc, _argv) \
+  do {								    \
+    (_fr)->result = (_rslt);					    \
+    (_fr)->cl     = (_cl);					    \
+    (_fr)->sel    = (_sel);					    \
+    (_fr)->argc   = (_argc);					    \
+    (_fr)->argv   = (_argv);					    \
+    (_fr)->prev   = mcfp;					    \
+    mcfp = (_fr);						    \
+    FRAME_PUSH((_fr)->base, FRAME_TYPE_METHOD_CALL);		    \
+  } while (0)
+
+#define METHOD_CALL_FRAME_POP()			\
+  do {						\
+    FRAME_POP();				\
+    mcfp = mcfp->prev;				\
+  } while (0)
+
+#define METHOD_CALL_FRAME_BEGIN(_rslt, _cl, _sel, _argc, _argv) \
+  {								\
+    struct method_call_frame __mcfr[1];				\
+    METHOD_CALL_FRAME_PUSH(__mcfr, (_rslt), (_cl), (_sel), (_argc), (_argv));
+
+#define METHOD_CALL_FRAME_END \
+    METHOD_CALL_FRAME_POP();
+  }
+
 #define MC_RESULT  (mcfp->result)
 #define MC_ARGC    (mcfp->argc)
 #define MC_ARG(x)  (mcfp->argv[x])
-
-void method_call_frame_push(struct method_call_frame *mcfr, obj_t *result, obj_t cl, obj_t sel, unsigned argc, obj_t *argv);
-void method_call_frame_pop(void);
 
 struct module_frame {
   struct frame        base[1];
@@ -369,35 +391,105 @@ struct module_frame {
 
 struct module_frame *modfp;
 
-void module_frame_push(struct module_frame *modfr, obj_t module);
-void module_frame_pop(void);
+#define MODULE_FRAME_PUSH(_fr, _mod)		\
+  do {						\
+    (_fr)->module = (_mod);			\
+    (_fr)->prev   = modfp;			\
+    modfp = (_fr);				\
+    FRAME_PUSH((_fr)->base, FRAME_TYPE_MODULE); \
+  } while (0)
+
+#define MODULE_FRAME_POP()			\
+  do {						\
+    FRAME_POP();				\
+    modfp = modfp->prev;			\
+  } while (0)
+
+#define MODULE_FRAME_BEGIN(_mod)		\
+  {						\
+    struct module_frame __modfr[1];		\
+    MODULE_FRAME_PUSH(__modfr, (_mod));
+
+#define MODULE_FRAME_END \
+    MODULE_FRAME_POP();	 \
+  }
+
+#define MODULE_CUR  (modfp->module)
+
+struct jmp_frame {
+  struct frame base[1];
+  jmp_buf      jmpbuf;
+  int          code;
+};
+
+#define JMP_FRAME_SETJMP(_fr) \
+  ((_fr)->code = setjmp((_fr)->jmp_buf))
+
+struct restart_frame {
+  struct jmp_frame     base[1];
+  struct restart_frame *prev;
+};
+
+struct restart_frame *rstfp;
+
+#define RESTART_FRAME_PUSH(_fr)				\
+  do {							\
+    (_fr)->prev = rstfp;				\
+    rstfp = (_fr);					\
+    FRAME_PUSH((_fr)->base->base, FRAME_TYPE_RESTART);	\
+    JMP_FRAME_SETJMP((_fr)->base);			\
+  } while (0)
+
+#define RESTART_FRAME_POP()			\
+  do {						\
+    FRAME_POP();				\
+    rstfp = rstfp->prev;			\
+  } while (0)
+
+#define RESTART_FRAME_BEGIN			\
+  {						\
+    struct restart_frame __rstfr[1];		\
+    RESTART_FRAME_PUSH(__rstfr);
+
+#define RESTART_FRAME_END	  \
+    RESTART_FRAME_POP();	  \
+  }
+
+#define RESTART_FRAME_CODE  (rstfp->base->code)
 
 struct block_frame {
-  struct frame       base[1];
+  struct jmp_frame   base[1];
   struct block_frame *prev;
   obj_t              dict;
 };
 
 struct block_frame *blkfp;
 
-static inline void
-block_frame_push(struct block_frame *blkfr, obj_t dict)
-{
-  blkfr->prev = blkfp;
-  blkfr->dict = dict;
+#define BLOCK_FRAME_PUSH(_dict)			     \
+  do {						     \
+    (_fr)->dict = (_dict);			     \
+    (_fr)->prev = blkfp;			     \
+    blkfp = (_fr);				     \
+    FRAME_PUSH((_fr)->base->base, FRAME_TYPE_BLOCK); \
+    JMP_FRAME_SETJMP((_fr)->base);		     \
+  } while (0)
 
-  blkfp = blkfr;
+#define BLOCK_FRAME_POP()			\
+  do {						\
+    FRAME_POP();				\
+    blkfp = blkfp->prev;			\
+  } while (0)
 
-  frame_push(blkfr->base, FRAME_TYPE_BLOCK);
-}
+#define BLOCK_FRAME_CODE  (blkfp->base->code)
 
-static inline void
-block_frame_pop(void)
-{
-  blkfp = blkfp->prev;
+#define BLOCK_FRAME_BEGIN(_dict)		\
+  {						\
+    struct block_frame __blkfr[1];		\
+    BLOCK_FRAME_PUSH(__blkfr, (_dict));
 
-  frame_pop();
-}
+#define BLOCK_FRAME_END \
+    BLOCK_FRAME_POP();	\
+  }
 
 
 void method_argc_err(void);
